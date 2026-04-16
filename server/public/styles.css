@@ -1,1 +1,717 @@
-/* forge workspace theme — populated in Task 5 */
+/* ============================================================
+   forge workspace — dark theme
+   Design tokens from forge-grid-view.html + forge-full-view.html
+   ============================================================ */
+
+/* 1. Reset + root tokens */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-body:        #0a0a0b;
+  --bg-surface:     #111113;
+  --bg-elevated:    #1c1c1f;
+  --bg-inset:       #0f0f11;
+  --border-primary: #27272a;
+  --border-subtle:  #1c1c1f;
+  --border-hover:   #3f3f46;
+  --accent:         #f97316;
+  --accent-bg:      rgba(249,115,22,0.1);
+  --text-primary:   #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-muted:     #71717a;
+  --text-faint:     #52525b;
+  --success:        #4ade80;
+  --success-bg:     #14532d;
+  --danger:         #f87171;
+  --danger-bg:      #450a0a;
+  --warning:        #facc15;
+  --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-stack);
+  background: var(--bg-body);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+/* ============================================================
+   2. Topbar
+   ============================================================ */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-logo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+.topbar-prompt {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 500px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+}
+
+.topbar-badge.live {
+  background: var(--success-bg);
+  border-color: #166534;
+  color: var(--success);
+}
+
+.topbar-badge.reconnecting {
+  background: #422006;
+  border-color: #78350f;
+  color: var(--warning);
+}
+
+.topbar-badge.disconnected {
+  background: var(--danger-bg);
+  border-color: #7f1d1d;
+  color: var(--danger);
+}
+
+/* ============================================================
+   3. Toolbar
+   ============================================================ */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tool-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.tool-btn.active {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tool-icon {
+  font-size: 14px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-primary);
+  margin: 0 4px;
+}
+
+.view-toggle {
+  display: flex;
+  background: var(--bg-elevated);
+  border-radius: 5px;
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+  margin-left: auto;
+}
+
+.view-toggle-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.view-toggle-btn.active {
+  background: var(--border-primary);
+  color: var(--accent);
+}
+
+/* ============================================================
+   4. Chip bar
+   ============================================================ */
+
+.chip-bar {
+  display: none; /* hidden in grid view */
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--bg-inset);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+body[data-view="full"] .chip-bar {
+  display: flex;
+}
+
+.chip-bar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.chip:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.chip.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.chip.liked::before {
+  content: '✓';
+  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--success-bg);
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chip.rejected {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.chip.rejected::before {
+  content: '✗';
+  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--danger-bg);
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chip-annotation-count {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ============================================================
+   5. Grid view
+   ============================================================ */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  padding-bottom: 60px;
+}
+
+body[data-view="full"] .grid {
+  display: none;
+}
+
+.panel {
+  border-radius: 10px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-surface);
+  overflow: hidden;
+  transition: border-color 0.2s;
+  position: relative;
+}
+
+.panel:hover {
+  border-color: var(--border-hover);
+}
+
+.panel.liked {
+  border-color: var(--accent);
+}
+
+.panel.rejected {
+  border-color: #ef4444;
+  opacity: 0.5;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+}
+
+.panel-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.panel-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.panel-action {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid var(--border-primary);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.panel-action:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.panel-action.liked {
+  background: var(--success-bg);
+  border-color: #166534;
+  color: var(--success);
+}
+
+.panel-action.rejected {
+  background: var(--danger-bg);
+  border-color: #7f1d1d;
+  color: var(--danger);
+}
+
+.panel-content {
+  padding: 0;
+  min-height: 280px;
+  position: relative;
+}
+
+.panel-content iframe {
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  border: none;
+  background: #fff;
+}
+
+/* ============================================================
+   6. Full view
+   ============================================================ */
+
+.full-view {
+  display: none;
+}
+
+body[data-view="full"] .full-view {
+  display: block;
+  padding: 24px;
+  padding-bottom: 60px;
+  max-width: 1100px;
+  margin: 0 auto;
+  margin-right: 300px;
+}
+
+.full-view-content {
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-surface);
+  overflow: hidden;
+  min-height: 500px;
+  position: relative;
+}
+
+.full-view-content iframe {
+  width: 100%;
+  min-height: 500px;
+  border: none;
+  background: #fff;
+}
+
+/* ============================================================
+   7. Notes sidebar
+   ============================================================ */
+
+.notes-panel {
+  display: none;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 300px;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-primary);
+  z-index: 30;
+}
+
+body[data-view="full"] .notes-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.notes-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notes-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.note-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+}
+
+.note-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.note-pin-ref {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.note-variation {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.note-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.note-text.struck {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.notes-input-area {
+  padding: 12px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.notes-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-stack);
+  resize: none;
+  height: 60px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.notes-input:focus {
+  border-color: var(--border-hover);
+}
+
+.notes-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   8. Annotation pins + tooltip + highlight
+   ============================================================ */
+
+.annotation-pin {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(249,115,22,0.4);
+  cursor: pointer;
+  z-index: 10;
+}
+
+.annotation-pin::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--accent);
+}
+
+.annotation-tooltip {
+  position: absolute;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  max-width: 200px;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.component-highlight {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  border-radius: 4px;
+  background: rgba(249,115,22,0.06);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ============================================================
+   9. Interaction overlay
+   ============================================================ */
+
+.interaction-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 15;
+}
+
+body[data-mode="annotate"] .interaction-overlay {
+  cursor: crosshair;
+}
+
+body[data-mode="select"] .interaction-overlay {
+  cursor: pointer;
+}
+
+/* ============================================================
+   10. Annotation input popup
+   ============================================================ */
+
+.annotation-input {
+  position: absolute;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 25;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.annotation-input input {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-stack);
+  outline: none;
+}
+
+.annotation-input input:focus {
+  border-color: var(--accent);
+}
+
+.annotation-input input::placeholder {
+  color: var(--text-muted);
+}
+
+.annotation-input button {
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.annotation-input button:hover {
+  opacity: 0.85;
+}
+
+/* ============================================================
+   11. Feedback bar
+   ============================================================ */
+
+.feedback-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 20px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  z-index: 20;
+}
+
+body[data-view="full"] .feedback-bar {
+  right: 300px;
+}
+
+.feedback-stats {
+  display: flex;
+  gap: 16px;
+  color: var(--text-muted);
+}
+
+.feedback-stats span {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.feedback-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.forge-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-stack);
+  transition: opacity 0.15s;
+}
+
+.forge-btn:hover {
+  opacity: 0.85;
+}
+
+.forge-btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.forge-btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+}

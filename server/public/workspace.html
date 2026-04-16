@@ -1,1 +1,78 @@
-<!DOCTYPE html><html><head><title>forge</title></head><body>forge workspace</body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>forge workspace</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body data-view="grid" data-mode="select">
+
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">⚒ forge</div>
+    <div class="topbar-prompt" id="prompt-display"></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-badge" id="channel-badge"></span>
+    <span class="topbar-badge" id="round-badge">Waiting...</span>
+  </div>
+</header>
+
+<nav class="toolbar">
+  <button class="tool-btn active" data-mode="select" title="Select components">
+    <span class="tool-icon">☚</span> Select
+  </button>
+  <button class="tool-btn" data-mode="annotate" title="Drop annotation pins">
+    <span class="tool-icon">📌</span> Annotate
+  </button>
+  <div class="toolbar-divider"></div>
+  <button class="tool-btn" id="btn-like-all" title="Like all selected">
+    <span class="tool-icon">👍</span>
+  </button>
+  <button class="tool-btn" id="btn-reject-all" title="Reject all selected">
+    <span class="tool-icon">👎</span>
+  </button>
+  <div class="toolbar-divider"></div>
+  <div class="view-toggle">
+    <button class="view-toggle-btn active" data-view="grid">Grid</button>
+    <button class="view-toggle-btn" data-view="full">Full</button>
+  </div>
+</nav>
+
+<div class="chip-bar" id="chip-bar">
+  <span class="chip-bar-label">Variations</span>
+</div>
+
+<div class="grid" id="grid-container"></div>
+
+<div class="full-view" id="full-container">
+  <div class="full-view-content" id="full-content"></div>
+</div>
+
+<aside class="notes-panel" id="notes-panel">
+  <div class="notes-header">
+    <span class="notes-title">Notes &amp; Annotations</span>
+  </div>
+  <div class="notes-list" id="notes-list"></div>
+  <div class="notes-input-area">
+    <textarea class="notes-input" id="general-note" placeholder="Add a general note..."></textarea>
+  </div>
+</aside>
+
+<footer class="feedback-bar" id="feedback-bar">
+  <div class="feedback-stats" id="feedback-stats">
+    <div>Selected: <span id="stat-selected">0</span></div>
+    <div>Annotations: <span id="stat-annotations">0</span></div>
+    <div>Rejected: <span id="stat-rejected">0</span></div>
+  </div>
+  <div class="feedback-actions">
+    <button class="forge-btn forge-btn-secondary" id="btn-clear">Clear All</button>
+    <button class="forge-btn forge-btn-primary" id="btn-send" style="display:none">Send to Claude</button>
+    <button class="forge-btn forge-btn-primary" id="btn-refine">Refine</button>
+  </div>
+</footer>
+
+<script src="/interactions.js"></script>
+</body>
+</html>
