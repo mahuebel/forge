@@ -1,0 +1,33 @@
+{
+  "name": "forge-marketplace",
+  "description": "Single-plugin marketplace distributing the forge visual variation workspace for Claude Code",
+  "owner": {
+    "name": "Mark Huebel",
+    "url": "https://github.com/mahuebel"
+  },
+  "plugins": [
+    {
+      "name": "forge",
+      "description": "Visual workspace for iterating on UI with Claude Code — point, comment, react, and refine in real time instead of describing changes in prose",
+      "version": "0.1.0",
+      "source": "./",
+      "author": {
+        "name": "Mark Huebel",
+        "url": "https://github.com/mahuebel"
+      },
+      "homepage": "https://github.com/mahuebel/forge",
+      "repository": "https://github.com/mahuebel/forge",
+      "license": "MIT",
+      "keywords": [
+        "ui",
+        "design",
+        "iteration",
+        "feedback",
+        "workspace",
+        "html",
+        "prototyping"
+      ],
+      "category": "design"
+    }
+  ]
+}

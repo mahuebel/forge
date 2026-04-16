@@ -51,10 +51,26 @@ curl -fsSL https://bun.sh/install | bash
 
 ### 2. Add the plugin to Claude Code
 
+Add the marketplace, then install the plugin:
+
+```bash
+/plugin marketplace add mahuebel/forge
+/plugin install forge@forge-marketplace
+```
+
+Both commands run inside Claude Code. The first pulls the marketplace manifest from `github.com/mahuebel/forge`; the second installs the plugin from it. No cloning required.
+
+<details>
+<summary>Prefer a local install for development?</summary>
+
 ```bash
 git clone https://github.com/mahuebel/forge.git
-claude plugin add ./forge
+# In Claude Code:
+/plugin marketplace add ./forge
+/plugin install forge@forge-marketplace
 ```
+
+</details>
 
 ### 3. Use it
 
