@@ -610,15 +610,44 @@
 
     const refineBtn = document.getElementById("btn-refine");
     if (refineBtn) {
-      refineBtn.addEventListener("click", () => {
-        // Visual cue — the bridge/skill reacts to the accumulated event stream.
+      refineBtn.addEventListener("click", async () => {
+        refineBtn.disabled = true;
         const original = refineBtn.textContent;
         refineBtn.textContent = "Refining...";
+
+        // Post a refine event. The bridge forwards it to stdout and the
+        // UserPromptSubmit hook picks it up on the developer's next message.
+        await postEvent({ type: "refine" });
+
+        // Show a transient toast telling the developer what to do next.
+        showRefineToast();
+
         setTimeout(() => {
           refineBtn.textContent = original;
-        }, 1200);
+          refineBtn.disabled = false;
+        }, 1500);
       });
     }
+  }
+
+  function showRefineToast() {
+    // Remove any existing toast
+    document.querySelectorAll(".forge-toast").forEach((t) => t.remove());
+
+    const toast = document.createElement("div");
+    toast.className = "forge-toast";
+    toast.textContent =
+      "Refine requested. Send any message to your Claude session (e.g. \"refine\") — the hook will inject your feedback.";
+    document.body.appendChild(toast);
+
+    // Fade in
+    requestAnimationFrame(() => toast.classList.add("visible"));
+
+    // Auto-dismiss after 6 seconds
+    setTimeout(() => {
+      toast.classList.remove("visible");
+      setTimeout(() => toast.remove(), 300);
+    }, 6000);
   }
 
   function buildSummary() {

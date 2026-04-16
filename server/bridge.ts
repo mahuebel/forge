@@ -18,6 +18,10 @@ export function formatEvent(event: ForgeEvent): string {
       return `[forge] Round ${event.round} generated: variations ${event.variations.join(", ")}\nPrompt: "${event.prompt}"`;
     case "heartbeat":
       return `[forge:heartbeat] uptime=${event.server_uptime_s}s events_sent=${event.events_sent}`;
+    case "refine": {
+      const noteText = event.note ? ` — "${event.note}"` : "";
+      return `[forge] Developer requested refinement${noteText}`;
+    }
     default:
       return `[forge] Unknown event: ${JSON.stringify(event)}`;
   }

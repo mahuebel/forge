@@ -1,0 +1,16 @@
+{
+  "description": "Injects unprocessed forge workspace feedback into the developer's next prompt",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/inject-forge-feedback.ts",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

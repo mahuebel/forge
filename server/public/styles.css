@@ -715,3 +715,31 @@ body[data-view="full"] .feedback-bar {
   color: var(--text-secondary);
   border: 1px solid var(--border-primary);
 }
+
+/* ============================================================
+   12. Refine toast — guidance after clicking Refine
+   ============================================================ */
+
+.forge-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  padding: 14px 20px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  color: var(--text-primary);
+  font-size: 13px;
+  max-width: 540px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 100;
+  line-height: 1.5;
+}
+
+.forge-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

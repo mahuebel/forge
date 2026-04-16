@@ -138,7 +138,13 @@ Recommend the right view mode when sharing the URL:
 
 ## Phase 3: Responding to Feedback
 
-Events arrive as formatted messages from the bridge (stdout from the channel). Process them as they come.
+Feedback reaches you through two paths:
+
+1. **Bridge stdout** (informational) — formatted event messages appear in `/tmp/forge-server.log`. You can tail this file or read it to see the live event stream.
+
+2. **UserPromptSubmit hook** (automatic) — on every message the developer sends, the `inject-forge-feedback` hook reads any unprocessed events from `.forge/sessions/*/state/events.jsonl` and injects them as additional context. You'll see them prepended to the developer's message under a `## forge workspace feedback` heading.
+
+The hook tracks progress via `.forge/sessions/<id>/bridge/injected-cursor`. It won't re-inject events you've already seen.
 
 ### Event formats you'll see
 
@@ -164,6 +170,11 @@ Events arrive as formatted messages from the bridge (stdout from the channel). P
 [forge] Component on Variation A liked: "Revenue stat card" (.stat-card:nth-child(2))
 ```
 
+**Refine request (from the Refine button):**
+```
+[forge] Developer requested refinement
+```
+
 **Heartbeat (ignore):**
 ```
 [forge:heartbeat] uptime=342s events_sent=17
@@ -177,6 +188,7 @@ Events arrive as formatted messages from the bridge (stdout from the channel). P
 | **Verdict — rejected** (with reason) | Acknowledge immediately. Confirm you understood the reason. Suggest alternatives. |
 | **Annotation** (with text) | Acknowledge immediately. Quote the note. Confirm it's queued for the next round. |
 | **Component selection** | Accumulate silently. Do NOT reply for each click. Wait for explicit refine request. |
+| **Refine** | Generate the next round of variations incorporating all accumulated feedback. |
 | **Heartbeat** | Ignore completely. No response. |
 | **Replayed event** (`"replayed": true`) | Process normally. Do not re-acknowledge events you already confirmed. |
 
@@ -190,7 +202,13 @@ Example acknowledgement for an annotation:
 
 ### Generating a new round
 
-When the developer types "refine", "next round", or clicks the Refine button in the workspace (which sends a message via the channel):
+The developer can trigger a refinement three ways:
+
+- **Type "refine" or "next round"** in their Claude session — the hook injects pending feedback alongside that message
+- **Invoke `/forge-refine`** as a slash command — explicitly asks you to process accumulated feedback and generate the next round
+- **Click the Refine button** in the workspace — posts a `refine` event. When the developer next sends you any message (even "ok"), the hook injects that refine signal along with all accumulated feedback
+
+When any of these happen:
 
 1. Reference the accumulated feedback explicitly:
    > You liked A's layout and the stat card pattern. You noted that B needs a time range picker (pin #2). C was rejected — too sparse. Here's Round 2...

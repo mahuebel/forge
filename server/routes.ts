@@ -32,7 +32,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 // ─── Valid event types ────────────────────────────────────────────────────────
 
-const VALID_TYPES = new Set(["select", "annotate", "verdict"]);
+const VALID_TYPES = new Set(["select", "annotate", "verdict", "refine"]);
 
 // ─── Content-type map for static files ───────────────────────────────────────
 

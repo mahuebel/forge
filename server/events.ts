@@ -48,12 +48,18 @@ export interface HeartbeatEvent extends BaseEvent {
   events_sent: number;
 }
 
+export interface RefineEvent extends BaseEvent {
+  type: "refine";
+  note?: string;
+}
+
 export type ForgeEvent =
   | SelectEvent
   | AnnotateEvent
   | VerdictEvent
   | RoundEvent
-  | HeartbeatEvent;
+  | HeartbeatEvent
+  | RefineEvent;
 
 // ─── JSONL utilities ───────────────────────────────────────────────────────
 
