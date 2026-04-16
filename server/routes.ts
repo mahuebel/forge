@@ -9,6 +9,7 @@ export interface RouteHandlerConfig {
   paths: SessionPaths;
   publicDir: string;
   getNextSeq: () => number;
+  broadcastToBrowsers?: (message: string) => void;
 }
 
 // ─── Module-level uptime reference ───────────────────────────────────────────
@@ -47,7 +48,7 @@ function contentTypeForExt(filename: string): string {
 export function createRouteHandler(
   config: RouteHandlerConfig
 ): (req: Request) => Promise<Response> {
-  const { paths, publicDir, getNextSeq } = config;
+  const { paths, publicDir, getNextSeq, broadcastToBrowsers } = config;
 
   return async function handler(req: Request): Promise<Response> {
     const url = new URL(req.url);
@@ -115,6 +116,23 @@ export function createRouteHandler(
 
       await appendEvent(paths.eventsFile, event);
       return jsonResponse(event, 201);
+    }
+
+    // POST /api/toast — channel server calls this to show a toast in the browser
+    if (method === "POST" && pathname === "/api/toast") {
+      let body: { message?: string } = {};
+      try {
+        body = await req.json();
+      } catch {
+        return jsonResponse({ error: "Invalid JSON body" }, 400);
+      }
+      if (typeof body.message !== "string" || !body.message.trim()) {
+        return jsonResponse({ error: "message required" }, 400);
+      }
+      if (broadcastToBrowsers) {
+        broadcastToBrowsers(JSON.stringify({ type: "toast", message: body.message }));
+      }
+      return jsonResponse({ ok: true });
     }
 
     // GET /content/:filename

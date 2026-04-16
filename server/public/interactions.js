@@ -631,23 +631,27 @@
   }
 
   function showRefineToast() {
+    showToast(
+      "Refine requested. If Claude Code is running with --channels, you'll get a live response. Otherwise, send any message to your Claude session and the hook will inject your feedback."
+    );
+  }
+
+  function showToast(message, durationMs) {
+    durationMs = durationMs || 6000;
     // Remove any existing toast
     document.querySelectorAll(".forge-toast").forEach((t) => t.remove());
 
     const toast = document.createElement("div");
     toast.className = "forge-toast";
-    toast.textContent =
-      "Refine requested. Send any message to your Claude session (e.g. \"refine\") — the hook will inject your feedback.";
+    toast.textContent = message;
     document.body.appendChild(toast);
 
-    // Fade in
     requestAnimationFrame(() => toast.classList.add("visible"));
 
-    // Auto-dismiss after 6 seconds
     setTimeout(() => {
       toast.classList.remove("visible");
       setTimeout(() => toast.remove(), 300);
-    }, 6000);
+    }, durationMs);
   }
 
   function buildSummary() {
@@ -702,6 +706,8 @@
           const msg = JSON.parse(event.data);
           if (msg && msg.type === "reload") {
             loadState();
+          } else if (msg && msg.type === "toast" && typeof msg.message === "string") {
+            showToast(msg.message);
           }
         } catch {
           // Ignore parse errors

@@ -1,6 +1,40 @@
 import { mkdir, writeFile, readFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
+import { homedir } from "os";
 import { join } from "path";
+
+// ─── Global active-sessions registry ─────────────────────────────────────────
+// The channel server (separate process spawned by Claude Code via --channels)
+// needs to discover HTTP servers running in various projects. Each HTTP server
+// writes its server-info.json here on startup and removes it on shutdown.
+
+export function getActiveSessionsDir(): string {
+  return join(homedir(), ".claude", "forge", "active-sessions");
+}
+
+export function getActiveSessionFile(sessionId: string): string {
+  return join(getActiveSessionsDir(), sessionId + ".json");
+}
+
+export async function registerActiveSession(
+  sessionId: string,
+  info: ServerInfo
+): Promise<void> {
+  const dir = getActiveSessionsDir();
+  await mkdir(dir, { recursive: true });
+  await writeFile(getActiveSessionFile(sessionId), JSON.stringify(info, null, 2));
+}
+
+export async function unregisterActiveSession(sessionId: string): Promise<void> {
+  const path = getActiveSessionFile(sessionId);
+  if (existsSync(path)) {
+    try {
+      await unlink(path);
+    } catch {
+      // best-effort
+    }
+  }
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

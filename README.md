@@ -60,6 +60,16 @@ Add the marketplace, then install the plugin:
 
 Both commands run inside Claude Code. The first pulls the marketplace manifest from `github.com/mahuebel/forge`; the second installs the plugin from it. No cloning required.
 
+**For real-time feedback** (recommended), start Claude Code with the channel flag:
+
+```bash
+claude --dangerously-load-development-channels plugin:forge@forge-marketplace
+```
+
+This enables [Claude Code Channels](https://code.claude.com/docs/en/channels) so your browser clicks arrive in Claude's session as `<channel source="forge">` events the moment they happen. The `--dangerously-load-development-channels` flag is only needed until forge is approved for the official channel allowlist.
+
+Without `--channels`, forge still works — a `UserPromptSubmit` hook picks up your pending browser feedback whenever you send any message in your Claude session.
+
 <details>
 <summary>Prefer a local install for development?</summary>
 

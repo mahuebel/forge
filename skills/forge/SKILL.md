@@ -138,13 +138,15 @@ Recommend the right view mode when sharing the URL:
 
 ## Phase 3: Responding to Feedback
 
-Feedback reaches you through two paths:
+Feedback reaches you through three paths, in decreasing order of immediacy:
 
-1. **Bridge stdout** (informational) — formatted event messages appear in `/tmp/forge-server.log`. You can tail this file or read it to see the live event stream.
+1. **Claude Code channel** (primary, real-time) — if the developer launched Claude Code with `--channels plugin:forge@forge-marketplace`, events arrive in your conversation as `<channel source="forge" ...>` tags the moment they happen in the browser. The `session_id`, `variation`, `action`, and `event_type` meta attributes tell you what to do. You can call the `notify-workspace` MCP tool to show a toast in the developer's browser (useful for acknowledging "working on Round 2…" before you've finished writing files).
 
-2. **UserPromptSubmit hook** (automatic) — on every message the developer sends, the `inject-forge-feedback` hook reads any unprocessed events from `.forge/sessions/*/state/events.jsonl` and injects them as additional context. You'll see them prepended to the developer's message under a `## forge workspace feedback` heading.
+2. **UserPromptSubmit hook** (fallback, on next message) — if `--channels` isn't in use, the `inject-forge-feedback` hook reads unprocessed events on the developer's next prompt and injects them as `## forge workspace feedback` context. Tracks progress via `.forge/sessions/<id>/bridge/injected-cursor`.
 
-The hook tracks progress via `.forge/sessions/<id>/bridge/injected-cursor`. It won't re-inject events you've already seen.
+3. **Bridge stdout** (observability) — formatted messages also appear in `/tmp/forge-server.log`. Useful for debugging or catching up after a restart.
+
+The channel and the hook use separate cursors (`channel-cursor` vs `injected-cursor`) so they don't fight each other. In practice, whichever path fires first for a given event wins — the other will see an empty delta next time it runs.
 
 ### Event formats you'll see
 

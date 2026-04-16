@@ -6,6 +6,8 @@ import {
   writePidFile,
   removePidFile,
   writeServerInfo,
+  registerActiveSession,
+  unregisterActiveSession,
 } from "./session";
 import { createRouteHandler } from "./routes";
 import { createContentWatcher } from "./watcher";
@@ -43,7 +45,16 @@ const getNextSeq = createSequenceCounter(existingCount);
 const wsClients = new Set<any>();
 
 // ── HTTP + WebSocket server ──
-const routeHandler = createRouteHandler({ paths, publicDir, getNextSeq });
+const broadcastToBrowsers = (message: string) => {
+  for (const ws of wsClients) ws.send(message);
+};
+
+const routeHandler = createRouteHandler({
+  paths,
+  publicDir,
+  getNextSeq,
+  broadcastToBrowsers,
+});
 
 const server = Bun.serve({
   port,
@@ -67,15 +78,22 @@ const server = Bun.serve({
 
 // ── PID + server info ──
 await writePidFile(paths.pidFile, process.pid);
-await writeServerInfo(paths.serverInfoFile, {
+const serverInfo = {
   port: server.port,
   url: "http://localhost:" + server.port,
   sessionId,
   contentDir: paths.content,
   eventsFile: paths.eventsFile,
-});
+};
+await writeServerInfo(paths.serverInfoFile, serverInfo);
+
+// Also register in the global active-sessions directory so the MCP channel
+// server (spawned separately by Claude Code --channels) can discover this
+// session and tail its events stream.
+await registerActiveSession(sessionId, serverInfo);
 
 console.log("[forge] Server running at http://localhost:" + server.port);
+console.log("[forge] Registered active session for channel discovery");
 
 // ── File watcher → notify browsers ──
 const watcher = createContentWatcher(paths.content, (files) => {
@@ -120,6 +138,9 @@ async function shutdown() {
   watcher.stop();
   try {
     await removePidFile(paths.pidFile);
+  } catch {}
+  try {
+    await unregisterActiveSession(sessionId);
   } catch {}
   server.stop();
   process.exit(0);

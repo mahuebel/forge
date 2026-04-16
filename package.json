@@ -1,0 +1,10 @@
+{
+  "name": "forge",
+  "version": "0.3.0",
+  "type": "module",
+  "private": true,
+  "description": "Visual workspace for iterating on UI with Claude Code",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

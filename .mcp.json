@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "forge": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/channel/server.ts"]
+    }
+  }
+}
