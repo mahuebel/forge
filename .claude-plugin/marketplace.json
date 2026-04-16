@@ -1,9 +1,12 @@
 {
   "name": "forge-marketplace",
-  "description": "Single-plugin marketplace distributing the forge visual variation workspace for Claude Code",
   "owner": {
     "name": "Mark Huebel",
     "url": "https://github.com/mahuebel"
+  },
+  "metadata": {
+    "description": "Single-plugin marketplace distributing the forge visual variation workspace for Claude Code",
+    "version": "0.1.0"
   },
   "plugins": [
     {

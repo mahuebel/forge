@@ -1,6 +1,21 @@
 {
   "name": "forge",
-  "description": "Visual variation workspace — generate, compare, and refine UI designs and architecture diagrams with structured feedback",
+  "description": "Visual workspace for iterating on UI with Claude Code — point, comment, react, and refine in real time instead of describing changes in prose",
   "version": "0.1.0",
-  "skills": ["skills/forge"]
+  "author": {
+    "name": "Mark Huebel",
+    "url": "https://github.com/mahuebel"
+  },
+  "homepage": "https://github.com/mahuebel/forge",
+  "repository": "https://github.com/mahuebel/forge",
+  "license": "MIT",
+  "keywords": [
+    "ui",
+    "design",
+    "iteration",
+    "feedback",
+    "workspace",
+    "html",
+    "prototyping"
+  ]
 }
