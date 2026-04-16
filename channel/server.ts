@@ -63,7 +63,7 @@ const tracked = new Map<string, TrackedSession>();
 // --- MCP Server --------------------------------------------------------------
 
 const mcp = new Server(
-  { name: "forge", version: "0.3.0" },
+  { name: "forge", version: "0.3.1" },
   {
     capabilities: {
       experimental: { "claude/channel": {} },

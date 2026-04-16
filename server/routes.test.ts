@@ -25,7 +25,12 @@ describe("HTTP routes", () => {
     paths = await createSession(tempDir, "test-session");
     const getNextSeq = createSequenceCounter(0);
     const publicDir = join(import.meta.dir, "public");
-    const handler = createRouteHandler({ paths, publicDir, getNextSeq });
+    const handler = createRouteHandler({
+      paths,
+      publicDir,
+      getNextSeq,
+      pluginVersion: "9.9.9-test",
+    });
     server = await startServer(handler);
   });
 
@@ -42,6 +47,12 @@ describe("HTTP routes", () => {
     const body = await res.json();
     expect(body.status).toBe("ok");
     expect(typeof body.uptime_s).toBe("number");
+  });
+
+  test("GET /health includes the plugin version", async () => {
+    const res = await fetch(`http://localhost:${server.port}/health`);
+    const body = await res.json();
+    expect(body.version).toBe("9.9.9-test");
   });
 
   // ─── GET /api/state ─────────────────────────────────────────────────────

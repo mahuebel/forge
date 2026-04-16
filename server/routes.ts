@@ -10,6 +10,9 @@ export interface RouteHandlerConfig {
   publicDir: string;
   getNextSeq: () => number;
   broadcastToBrowsers?: (message: string) => void;
+  /** Plugin version — surfaced in /health so the skill can detect
+   * when a running server is from an older plugin version. */
+  pluginVersion?: string;
 }
 
 // ─── Module-level uptime reference ───────────────────────────────────────────
@@ -48,7 +51,7 @@ function contentTypeForExt(filename: string): string {
 export function createRouteHandler(
   config: RouteHandlerConfig
 ): (req: Request) => Promise<Response> {
-  const { paths, publicDir, getNextSeq, broadcastToBrowsers } = config;
+  const { paths, publicDir, getNextSeq, broadcastToBrowsers, pluginVersion } = config;
 
   return async function handler(req: Request): Promise<Response> {
     const url = new URL(req.url);
@@ -65,6 +68,7 @@ export function createRouteHandler(
       return jsonResponse({
         status: "ok",
         uptime_s: (Date.now() - startTime) / 1000,
+        version: pluginVersion ?? "unknown",
       });
     }
 

@@ -32,8 +32,20 @@ For each match, use the Read tool to get the `port` field, then run:
 curl -sf http://localhost:<port>/health
 ```
 
-- If the curl succeeds with `"status":"ok"` → that's this project's live server. Use the `url` and `sessionId` from that `server-info.json`. Skip to Step 3.
-- If all health checks fail or no files match → launch a new server (Step 2).
+If it succeeds with `"status":"ok"`, also check the `version` field in the response against the current plugin version. Read the current plugin version from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`.
+
+- **Health ok AND version matches** → this project's live server is current. Use the `url` and `sessionId` from that `server-info.json`. Skip to Step 3.
+- **Health ok BUT version differs** (or the `/health` response has no `version` field — that means it's a pre-0.3.1 server) → the plugin was updated but the running server is stale. Kill it and relaunch:
+
+  ```bash
+  # Read the pid from server-info.json, then:
+  kill <old-pid>
+  # Wait a moment for the port to free, then proceed to Step 2
+  ```
+
+  Tell the developer: "Plugin updated — restarting the forge server from version X.Y.Z."
+
+- **Health check fails / no files match** → launch a new server (Step 2).
 
 ### Step 2: Launch the server
 

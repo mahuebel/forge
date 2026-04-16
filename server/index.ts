@@ -1,6 +1,7 @@
 // server/index.ts
 import { join } from "path";
 import { parseArgs } from "util";
+import { readFileSync } from "fs";
 import {
   createSession,
   writePidFile,
@@ -31,6 +32,21 @@ const baseDir = values.base!;
 // publicDir is co-located with this index.ts: server/public
 const publicDir = join(import.meta.dir, "public");
 
+// Read plugin version from the manifest so clients (and the SKILL.md
+// health check) can detect when a plugin update has happened and a
+// restart is required.
+function readPluginVersion(): string {
+  try {
+    const manifestPath = join(import.meta.dir, "..", ".claude-plugin", "plugin.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    return typeof manifest.version === "string" ? manifest.version : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+const pluginVersion = readPluginVersion();
+
 // ── Session setup ──
 const paths = await createSession(baseDir, sessionId);
 console.log("[forge] Session: " + sessionId);
@@ -54,6 +70,7 @@ const routeHandler = createRouteHandler({
   publicDir,
   getNextSeq,
   broadcastToBrowsers,
+  pluginVersion,
 });
 
 const server = Bun.serve({
@@ -84,6 +101,7 @@ const serverInfo = {
   sessionId,
   contentDir: paths.content,
   eventsFile: paths.eventsFile,
+  version: pluginVersion,
 };
 await writeServerInfo(paths.serverInfoFile, serverInfo);
 

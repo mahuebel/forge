@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Single-plugin marketplace distributing the forge visual variation workspace for Claude Code",
-    "version": "0.3.0"
+    "version": "0.3.1"
   },
   "plugins": [
     {
       "name": "forge",
       "description": "Visual workspace for iterating on UI with Claude Code — point, comment, react, and refine in real time instead of describing changes in prose",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "source": "./",
       "author": {
         "name": "Mark Huebel",

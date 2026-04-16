@@ -55,6 +55,11 @@ export interface ServerInfo {
   sessionId: string;
   contentDir: string;
   eventsFile: string;
+  /** Plugin version this server was launched from. Used by the skill's
+   * Phase 1 health check to detect when the plugin has been updated and
+   * the running server needs to be restarted. Optional for backward
+   * compatibility with server-info.json written by pre-0.3.1 servers. */
+  version?: string;
 }
 
 // ─── Path construction ───────────────────────────────────────────────────────
