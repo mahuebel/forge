@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge Workspace — Full View Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0b;
+    color: #e4e4e7;
+    min-height: 100vh;
+  }
+
+  /* Top bar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: #111113;
+    border-bottom: 1px solid #27272a;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .topbar-logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f97316;
+    letter-spacing: -0.5px;
+  }
+  .topbar-prompt {
+    font-size: 13px;
+    color: #71717a;
+    max-width: 500px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .topbar-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #1c1c1f;
+    border: 1px solid #27272a;
+    color: #a1a1aa;
+  }
+  .topbar-badge.live {
+    background: #14532d;
+    border-color: #166534;
+    color: #4ade80;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    background: #111113;
+    border-bottom: 1px solid #1c1c1f;
+  }
+  .tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #a1a1aa;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tool-btn:hover { background: #1c1c1f; color: #e4e4e7; }
+  .tool-btn.active {
+    background: #1c1c1f;
+    border-color: #f97316;
+    color: #f97316;
+  }
+  .tool-icon { font-size: 14px; }
+  .toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background: #27272a;
+    margin: 0 4px;
+  }
+
+  /* View mode toggle */
+  .view-toggle {
+    display: flex;
+    background: #1c1c1f;
+    border-radius: 5px;
+    border: 1px solid #27272a;
+    overflow: hidden;
+    margin-left: auto;
+  }
+  .view-toggle-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #71717a;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .view-toggle-btn.active {
+    background: #27272a;
+    color: #f97316;
+  }
+
+  /* Variation chips */
+  .chip-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: #0f0f11;
+    border-bottom: 1px solid #1c1c1f;
+  }
+  .chip-bar-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 4px;
+  }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid #27272a;
+    background: #111113;
+    color: #a1a1aa;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .chip:hover {
+    border-color: #3f3f46;
+    color: #e4e4e7;
+  }
+  .chip.active {
+    border-color: #f97316;
+    background: rgba(249,115,22,0.1);
+    color: #f97316;
+  }
+  .chip.liked::before {
+    content: '✓';
+    font-size: 10px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #14532d;
+    color: #4ade80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chip.rejected {
+    opacity: 0.45;
+    text-decoration: line-through;
+  }
+  .chip.rejected::before {
+    content: '✗';
+    font-size: 10px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #450a0a;
+    color: #f87171;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chip-annotation-count {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: #f97316;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  /* Full view content area */
+  .full-view {
+    padding: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* Mock full page — dashboard */
+  .mock-page {
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    background: #111113;
+    overflow: hidden;
+    position: relative;
+  }
+  .mock-page-topnav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: #0f0f11;
+    border-bottom: 1px solid #1c1c1f;
+  }
+  .mock-page-logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: #e4e4e7;
+  }
+  .mock-page-nav {
+    display: flex;
+    gap: 20px;
+  }
+  .mock-page-nav-item {
+    font-size: 13px;
+    color: #71717a;
+    cursor: pointer;
+  }
+  .mock-page-nav-item.active { color: #f97316; }
+  .mock-page-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mock-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #27272a;
+  }
+
+  .mock-page-body {
+    display: flex;
+    min-height: 480px;
+  }
+
+  /* Sidebar */
+  .mock-page-sidebar {
+    width: 200px;
+    padding: 16px;
+    border-right: 1px solid #1c1c1f;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .mock-page-sidebar-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #71717a;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mock-page-sidebar-item.active {
+    background: rgba(249,115,22,0.1);
+    color: #f97316;
+  }
+  .mock-page-sidebar-item .icon { font-size: 14px; }
+  .sidebar-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #3f3f46;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 12px 12px 4px;
+  }
+
+  /* Main content */
+  .mock-page-main {
+    flex: 1;
+    padding: 24px;
+  }
+  .mock-page-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #e4e4e7;
+    margin-bottom: 4px;
+  }
+  .mock-page-subtitle {
+    font-size: 13px;
+    color: #71717a;
+    margin-bottom: 20px;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    padding: 16px;
+    border-radius: 8px;
+    background: #1c1c1f;
+    border: 1px solid #27272a;
+  }
+  .stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #e4e4e7;
+  }
+  .stat-change {
+    font-size: 11px;
+    margin-top: 4px;
+  }
+  .stat-change.up { color: #4ade80; }
+  .stat-change.down { color: #f87171; }
+
+  /* Chart placeholder */
+  .chart-area {
+    border-radius: 8px;
+    background: #1c1c1f;
+    border: 1px solid #27272a;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e4e4e7;
+  }
+  .chart-placeholder {
+    height: 160px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #18181b 0%, #1c1c1f 100%);
+    display: flex;
+    align-items: flex-end;
+    padding: 0 8px 8px;
+    gap: 6px;
+  }
+  .chart-bar {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    background: #f97316;
+    opacity: 0.7;
+    min-height: 12px;
+  }
+
+  /* Table placeholder */
+  .table-area {
+    border-radius: 8px;
+    background: #1c1c1f;
+    border: 1px solid #27272a;
+    overflow: hidden;
+  }
+  .table-header-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    padding: 10px 16px;
+    border-bottom: 1px solid #27272a;
+    font-size: 11px;
+    font-weight: 600;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .table-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    padding: 10px 16px;
+    border-bottom: 1px solid #18181b;
+    font-size: 13px;
+    color: #a1a1aa;
+  }
+  .table-row:last-child { border-bottom: none; }
+
+  /* Annotation pins */
+  .annotation-pin {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #f97316;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(249,115,22,0.4);
+    cursor: pointer;
+    z-index: 10;
+  }
+  .annotation-pin::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #f97316;
+  }
+
+  .annotation-tooltip {
+    position: absolute;
+    background: #1c1c1f;
+    border: 1px solid #f97316;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #e4e4e7;
+    max-width: 200px;
+    z-index: 20;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+
+  /* Component highlight */
+  .component-highlight {
+    position: absolute;
+    border: 2px dashed #f97316;
+    border-radius: 4px;
+    background: rgba(249,115,22,0.06);
+    pointer-events: none;
+  }
+
+  /* Notes sidebar */
+  .notes-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 300px;
+    background: #111113;
+    border-left: 1px solid #27272a;
+    display: flex;
+    flex-direction: column;
+    z-index: 30;
+  }
+  .notes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid #27272a;
+  }
+  .notes-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e4e4e7;
+  }
+  .notes-close {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: #71717a;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .notes-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .note-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #1c1c1f;
+    border: 1px solid #27272a;
+  }
+  .note-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .note-pin-ref {
+    font-size: 11px;
+    font-weight: 700;
+    color: #f97316;
+  }
+  .note-variation {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(249,115,22,0.1);
+    color: #f97316;
+  }
+  .note-text {
+    font-size: 12px;
+    color: #a1a1aa;
+    line-height: 1.5;
+  }
+  .notes-input-area {
+    padding: 12px;
+    border-top: 1px solid #27272a;
+  }
+  .notes-input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #27272a;
+    background: #1c1c1f;
+    color: #e4e4e7;
+    font-size: 12px;
+    resize: none;
+    height: 60px;
+  }
+
+  /* Adjust main area for notes panel */
+  .full-view { margin-right: 300px; }
+
+  /* Feedback bar */
+  .feedback-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 300px;
+    padding: 10px 20px;
+    background: #111113;
+    border-top: 1px solid #27272a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+  .feedback-stats {
+    display: flex;
+    gap: 16px;
+    color: #71717a;
+  }
+  .feedback-stat span { color: #e4e4e7; font-weight: 600; }
+  .mock-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mock-btn-primary { background: #f97316; color: #fff; }
+  .mock-btn-secondary { background: #1c1c1f; color: #a1a1aa; border: 1px solid #27272a; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">&#9878; forge</div>
+    <div class="topbar-prompt">"3 variations of a provider dashboard with appointments, messages, and analytics"</div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-badge live">&#9679; Channel Live</span>
+    <span class="topbar-badge">Round 1</span>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="tool-btn" title="Select components">
+    <span class="tool-icon">&#9754;</span> Select
+  </button>
+  <button class="tool-btn active" title="Annotate">
+    <span class="tool-icon">&#128204;</span> Annotate
+  </button>
+  <button class="tool-btn" title="Compare side by side">
+    <span class="tool-icon">&#8596;</span> Compare
+  </button>
+  <div class="toolbar-divider"></div>
+  <button class="tool-btn">
+    <span class="tool-icon">&#128077;</span>
+  </button>
+  <button class="tool-btn">
+    <span class="tool-icon">&#128078;</span>
+  </button>
+  <div class="toolbar-divider"></div>
+
+  <!-- View mode toggle -->
+  <div class="view-toggle">
+    <button class="view-toggle-btn">Grid</button>
+    <button class="view-toggle-btn active">Full</button>
+  </div>
+</div>
+
+<!-- Variation chips -->
+<div class="chip-bar">
+  <span class="chip-bar-label">Variations</span>
+  <div class="chip active liked">
+    A — Clinical Focus
+    <span class="chip-annotation-count">2</span>
+  </div>
+  <div class="chip">
+    B — Analytics First
+  </div>
+  <div class="chip rejected">
+    C — Minimal Flat
+  </div>
+</div>
+
+<!-- Full view content -->
+<div class="full-view">
+  <div class="mock-page">
+    <!-- Page top nav -->
+    <div class="mock-page-topnav">
+      <div class="mock-page-logo">TimelyCare</div>
+      <div class="mock-page-nav">
+        <span class="mock-page-nav-item active">Dashboard</span>
+        <span class="mock-page-nav-item">Appointments</span>
+        <span class="mock-page-nav-item">Messages</span>
+        <span class="mock-page-nav-item">Patients</span>
+        <span class="mock-page-nav-item">Reports</span>
+      </div>
+      <div class="mock-page-user">
+        <span style="font-size:13px;color:#a1a1aa;">Dr. Smith</span>
+        <div class="mock-avatar"></div>
+      </div>
+    </div>
+
+    <div class="mock-page-body">
+      <!-- Sidebar -->
+      <div class="mock-page-sidebar">
+        <div class="sidebar-section-label">Overview</div>
+        <div class="mock-page-sidebar-item active">
+          <span class="icon">&#9632;</span> Dashboard
+        </div>
+        <div class="mock-page-sidebar-item">
+          <span class="icon">&#128197;</span> Schedule
+        </div>
+        <div class="sidebar-section-label">Clinical</div>
+        <div class="mock-page-sidebar-item">
+          <span class="icon">&#128101;</span> Patients
+        </div>
+        <div class="mock-page-sidebar-item">
+          <span class="icon">&#128172;</span> Messages
+        </div>
+        <div class="mock-page-sidebar-item">
+          <span class="icon">&#128196;</span> Notes
+        </div>
+        <div class="sidebar-section-label">Admin</div>
+        <div class="mock-page-sidebar-item">
+          <span class="icon">&#128200;</span> Analytics
+        </div>
+        <div class="mock-page-sidebar-item">
+          <span class="icon">&#9881;</span> Settings
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div class="mock-page-main">
+        <div class="mock-page-title">Good morning, Dr. Smith</div>
+        <div class="mock-page-subtitle">You have 8 appointments today and 3 unread messages</div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Today's Appts</div>
+            <div class="stat-value">8</div>
+            <div class="stat-change up">+2 from yesterday</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Unread Messages</div>
+            <div class="stat-value">3</div>
+            <div class="stat-change down">Urgent: 1</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Patients This Week</div>
+            <div class="stat-value">34</div>
+            <div class="stat-change up">+12% vs last week</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Satisfaction</div>
+            <div class="stat-value">4.8</div>
+            <div class="stat-change up">&#9733; Top 10%</div>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="chart-area">
+          <div class="chart-header">
+            <span class="chart-title">Appointment Volume — Last 14 Days</span>
+            <button class="mock-btn mock-btn-secondary" style="padding:4px 10px;font-size:11px;">Export</button>
+          </div>
+          <div class="chart-placeholder">
+            <div class="chart-bar" style="height:40%"></div>
+            <div class="chart-bar" style="height:55%"></div>
+            <div class="chart-bar" style="height:45%"></div>
+            <div class="chart-bar" style="height:70%"></div>
+            <div class="chart-bar" style="height:60%"></div>
+            <div class="chart-bar" style="height:80%"></div>
+            <div class="chart-bar" style="height:65%"></div>
+            <div class="chart-bar" style="height:50%"></div>
+            <div class="chart-bar" style="height:75%"></div>
+            <div class="chart-bar" style="height:90%"></div>
+            <div class="chart-bar" style="height:70%"></div>
+            <div class="chart-bar" style="height:85%"></div>
+            <div class="chart-bar" style="height:60%"></div>
+            <div class="chart-bar" style="height:95%"></div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-area">
+          <div class="table-header-row">
+            <span>Patient</span>
+            <span>Time</span>
+            <span>Type</span>
+            <span>Status</span>
+          </div>
+          <div class="table-row">
+            <span>Alex Johnson</span>
+            <span>9:00 AM</span>
+            <span>Follow-up</span>
+            <span style="color:#4ade80;">Confirmed</span>
+          </div>
+          <div class="table-row">
+            <span>Maria Garcia</span>
+            <span>9:30 AM</span>
+            <span>Initial</span>
+            <span style="color:#4ade80;">Confirmed</span>
+          </div>
+          <div class="table-row">
+            <span>James Wilson</span>
+            <span>10:00 AM</span>
+            <span>Urgent</span>
+            <span style="color:#facc15;">Pending</span>
+          </div>
+          <div class="table-row">
+            <span>Sarah Chen</span>
+            <span>10:30 AM</span>
+            <span>Follow-up</span>
+            <span style="color:#4ade80;">Confirmed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Annotation pins on the page -->
+    <div class="annotation-pin" style="top: 110px; left: 150px;">1</div>
+    <div class="annotation-tooltip" style="top: 90px; left: 178px;">
+      Sidebar grouping is exactly right — keep Clinical / Admin split
+    </div>
+
+    <div class="annotation-pin" style="top: 210px; right: 340px;">2</div>
+    <div class="annotation-tooltip" style="top: 190px; right: 368px;">
+      Stats cards need a "click to drill down" affordance
+    </div>
+
+    <!-- Component highlight on stats row -->
+    <div class="component-highlight" style="top: 178px; left: 218px; right: 318px; height: 88px;"></div>
+
+  </div>
+</div>
+
+<!-- Notes sidebar -->
+<div class="notes-panel">
+  <div class="notes-header">
+    <span class="notes-title">Notes &amp; Annotations</span>
+    <button class="notes-close">&#10005;</button>
+  </div>
+  <div class="notes-list">
+    <div class="note-item">
+      <div class="note-meta">
+        <span class="note-pin-ref">Pin #1</span>
+        <span class="note-variation">Variation A</span>
+      </div>
+      <div class="note-text">Sidebar grouping is exactly right — keep the Clinical / Admin split</div>
+    </div>
+    <div class="note-item">
+      <div class="note-meta">
+        <span class="note-pin-ref">Pin #2</span>
+        <span class="note-variation">Variation A</span>
+      </div>
+      <div class="note-text">Stats cards need a "click to drill down" affordance — tapping a card should expand or navigate to a detail view</div>
+    </div>
+    <div class="note-item" style="border-color: #27272a;">
+      <div class="note-meta">
+        <span class="note-pin-ref" style="color:#71717a;">General</span>
+        <span class="note-variation">Variation C</span>
+      </div>
+      <div class="note-text" style="color:#71717a; text-decoration: line-through;">Too stripped down — losing important context at a glance</div>
+    </div>
+  </div>
+  <div class="notes-input-area">
+    <textarea class="notes-input" placeholder="Add a general note..."></textarea>
+  </div>
+</div>
+
+<!-- Feedback bar -->
+<div class="feedback-bar">
+  <div class="feedback-stats">
+    <div>Viewing: <span>A — Clinical Focus</span></div>
+    <div>Annotations: <span>2</span></div>
+    <div>Rejected: <span>1 variation</span></div>
+  </div>
+</div>
+
+</body>
+</html>

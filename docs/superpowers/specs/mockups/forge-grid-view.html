@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge Workspace — Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0b;
+    color: #e4e4e7;
+    min-height: 100vh;
+  }
+
+  /* Top bar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: #111113;
+    border-bottom: 1px solid #27272a;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .topbar-logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f97316;
+    letter-spacing: -0.5px;
+  }
+  .topbar-prompt {
+    font-size: 13px;
+    color: #71717a;
+    max-width: 500px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .topbar-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #1c1c1f;
+    border: 1px solid #27272a;
+    color: #a1a1aa;
+  }
+  .topbar-badge.live {
+    background: #14532d;
+    border-color: #166534;
+    color: #4ade80;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    background: #111113;
+    border-bottom: 1px solid #1c1c1f;
+  }
+  .tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #a1a1aa;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tool-btn:hover { background: #1c1c1f; color: #e4e4e7; }
+  .tool-btn.active {
+    background: #1c1c1f;
+    border-color: #f97316;
+    color: #f97316;
+  }
+  .tool-icon { font-size: 14px; }
+  .toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background: #27272a;
+    margin: 0 4px;
+  }
+
+  /* Variation grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 20px;
+  }
+
+  /* Variation panel */
+  .panel {
+    border-radius: 10px;
+    border: 1px solid #27272a;
+    background: #111113;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    position: relative;
+  }
+  .panel:hover { border-color: #3f3f46; }
+  .panel.selected { border-color: #f97316; }
+  .panel.rejected { border-color: #ef4444; opacity: 0.5; }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #1c1c1f;
+    background: #0f0f11;
+  }
+  .panel-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e4e4e7;
+  }
+  .panel-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .panel-action {
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    border: 1px solid #27272a;
+    background: transparent;
+    color: #71717a;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .panel-action:hover { background: #1c1c1f; color: #e4e4e7; }
+  .panel-action.liked { background: #14532d; border-color: #166534; color: #4ade80; }
+  .panel-action.disliked { background: #450a0a; border-color: #7f1d1d; color: #f87171; }
+
+  /* Mock UI content inside panels */
+  .panel-content {
+    padding: 16px;
+    min-height: 280px;
+    position: relative;
+  }
+
+  /* Simulated settings page UI */
+  .mock-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .mock-settings-header {
+    font-size: 16px;
+    font-weight: 700;
+    color: #e4e4e7;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1c1c1f;
+  }
+  .mock-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .mock-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .mock-input-bar {
+    height: 32px;
+    border-radius: 6px;
+    background: #1c1c1f;
+    border: 1px solid #27272a;
+  }
+  .mock-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+  .mock-toggle-label { font-size: 13px; color: #a1a1aa; }
+  .mock-toggle {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: #27272a;
+    position: relative;
+  }
+  .mock-toggle.on { background: #f97316; }
+  .mock-toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+  }
+  .mock-toggle.on::after { transform: translateX(16px); }
+  .mock-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mock-btn-primary { background: #f97316; color: #fff; }
+  .mock-btn-secondary { background: #1c1c1f; color: #a1a1aa; border: 1px solid #27272a; }
+
+  /* Variation B - card layout */
+  .mock-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .mock-card {
+    border-radius: 8px;
+    padding: 14px;
+    background: #1c1c1f;
+    border: 1px solid #27272a;
+  }
+  .mock-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e4e4e7;
+    margin-bottom: 6px;
+  }
+
+  /* Variation C - sidebar layout */
+  .mock-sidebar-layout {
+    display: flex;
+    gap: 12px;
+    height: 100%;
+  }
+  .mock-sidebar-nav {
+    width: 90px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .mock-sidebar-item {
+    padding: 7px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: #71717a;
+    cursor: pointer;
+  }
+  .mock-sidebar-item.active {
+    background: #1c1c1f;
+    color: #f97316;
+  }
+  .mock-sidebar-content {
+    flex: 1;
+    padding-left: 12px;
+    border-left: 1px solid #1c1c1f;
+  }
+
+  /* Annotation pin */
+  .annotation-pin {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #f97316;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(249,115,22,0.4);
+    cursor: pointer;
+    z-index: 10;
+  }
+  .annotation-pin::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #f97316;
+  }
+
+  /* Component highlight */
+  .component-highlight {
+    position: absolute;
+    border: 2px dashed #f97316;
+    border-radius: 4px;
+    background: rgba(249,115,22,0.06);
+    pointer-events: none;
+  }
+
+  /* Annotation tooltip */
+  .annotation-tooltip {
+    position: absolute;
+    background: #1c1c1f;
+    border: 1px solid #f97316;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #e4e4e7;
+    max-width: 180px;
+    z-index: 20;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+
+  /* Feedback summary bar */
+  .feedback-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 20px;
+    background: #111113;
+    border-top: 1px solid #27272a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+  .feedback-stats {
+    display: flex;
+    gap: 16px;
+    color: #71717a;
+  }
+  .feedback-stat span { color: #e4e4e7; font-weight: 600; }
+  .feedback-actions {
+    display: flex;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">&#9878; forge</div>
+    <div class="topbar-prompt">"Show me 3 variations of a settings page with dark theme"</div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-badge live">&#9679; Channel Live</span>
+    <span class="topbar-badge">Round 2 of 3</span>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="tool-btn" title="Select mode">
+    <span class="tool-icon">&#9754;</span> Select
+  </button>
+  <button class="tool-btn active" title="Annotate mode">
+    <span class="tool-icon">&#128204;</span> Annotate
+  </button>
+  <button class="tool-btn" title="Compare mode">
+    <span class="tool-icon">&#8596;</span> Compare
+  </button>
+  <div class="toolbar-divider"></div>
+  <button class="tool-btn" title="Like all selected">
+    <span class="tool-icon">&#128077;</span>
+  </button>
+  <button class="tool-btn" title="Reject all selected">
+    <span class="tool-icon">&#128078;</span>
+  </button>
+  <div class="toolbar-divider"></div>
+  <button class="tool-btn">
+    <span class="tool-icon">&#128269;</span> Zoom
+  </button>
+</div>
+
+<!-- Variation Grid -->
+<div class="grid">
+
+  <!-- Variation A — Form Layout (selected) -->
+  <div class="panel selected">
+    <div class="panel-header">
+      <span class="panel-label">A — Stacked Form</span>
+      <div class="panel-actions">
+        <button class="panel-action liked" title="Liked">&#10003;</button>
+        <button class="panel-action" title="Reject">&#10007;</button>
+      </div>
+    </div>
+    <div class="panel-content">
+      <div class="mock-settings">
+        <div class="mock-settings-header">Account Settings</div>
+        <div class="mock-field">
+          <div class="mock-label">Display Name</div>
+          <div class="mock-input-bar"></div>
+        </div>
+        <div class="mock-field">
+          <div class="mock-label">Email</div>
+          <div class="mock-input-bar"></div>
+        </div>
+        <div class="mock-toggle-row">
+          <span class="mock-toggle-label">Email notifications</span>
+          <div class="mock-toggle on"></div>
+        </div>
+        <div class="mock-toggle-row">
+          <span class="mock-toggle-label">Two-factor auth</span>
+          <div class="mock-toggle"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="mock-btn mock-btn-primary">Save</button>
+          <button class="mock-btn mock-btn-secondary">Cancel</button>
+        </div>
+      </div>
+      <!-- Annotation pin example -->
+      <div class="annotation-pin" style="top: 58px; right: 20px;">1</div>
+      <div class="annotation-tooltip" style="top: 38px; right: 48px;">
+        Love this header treatment — keep it
+      </div>
+    </div>
+  </div>
+
+  <!-- Variation B — Card Layout -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-label">B — Card Groups</span>
+      <div class="panel-actions">
+        <button class="panel-action" title="Like">&#10003;</button>
+        <button class="panel-action" title="Reject">&#10007;</button>
+      </div>
+    </div>
+    <div class="panel-content">
+      <div class="mock-settings">
+        <div class="mock-settings-header">Account Settings</div>
+        <div class="mock-card-grid">
+          <div class="mock-card">
+            <div class="mock-card-title">Profile</div>
+            <div class="mock-field">
+              <div class="mock-label">Name</div>
+              <div class="mock-input-bar"></div>
+            </div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-title">Security</div>
+            <div class="mock-toggle-row">
+              <span class="mock-toggle-label">2FA</span>
+              <div class="mock-toggle on"></div>
+            </div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-title">Notifications</div>
+            <div class="mock-toggle-row">
+              <span class="mock-toggle-label">Email</span>
+              <div class="mock-toggle on"></div>
+            </div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-title">Appearance</div>
+            <div class="mock-toggle-row">
+              <span class="mock-toggle-label">Dark</span>
+              <div class="mock-toggle on"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Component highlight example -->
+      <div class="component-highlight" style="top: 55px; left: 12px; right: 12px; height: 155px;"></div>
+      <div class="annotation-pin" style="top: 48px; left: 22px;">2</div>
+      <div class="annotation-tooltip" style="top: 28px; left: 48px;">
+        Card grid is nice but feels cramped at this size
+      </div>
+    </div>
+  </div>
+
+  <!-- Variation C — Sidebar Layout (rejected) -->
+  <div class="panel rejected">
+    <div class="panel-header">
+      <span class="panel-label">C — Sidebar Nav</span>
+      <div class="panel-actions">
+        <button class="panel-action" title="Like">&#10003;</button>
+        <button class="panel-action disliked" title="Rejected">&#10007;</button>
+      </div>
+    </div>
+    <div class="panel-content">
+      <div class="mock-sidebar-layout">
+        <div class="mock-sidebar-nav">
+          <div class="mock-sidebar-item active">Profile</div>
+          <div class="mock-sidebar-item">Security</div>
+          <div class="mock-sidebar-item">Notifs</div>
+          <div class="mock-sidebar-item">Display</div>
+          <div class="mock-sidebar-item">Billing</div>
+        </div>
+        <div class="mock-sidebar-content">
+          <div class="mock-settings">
+            <div class="mock-settings-header">Profile</div>
+            <div class="mock-field">
+              <div class="mock-label">Display Name</div>
+              <div class="mock-input-bar"></div>
+            </div>
+            <div class="mock-field">
+              <div class="mock-label">Email</div>
+              <div class="mock-input-bar"></div>
+            </div>
+            <div class="mock-field">
+              <div class="mock-label">Avatar</div>
+              <div style="width:48px;height:48px;border-radius:50%;background:#27272a;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Feedback summary bar -->
+<div class="feedback-bar">
+  <div class="feedback-stats">
+    <div>Selected: <span>1</span></div>
+    <div>Annotations: <span>2</span></div>
+    <div>Rejected: <span>1</span></div>
+  </div>
+  <div class="feedback-actions">
+    <button class="mock-btn mock-btn-secondary">Clear All</button>
+    <button class="mock-btn mock-btn-primary">&#9889; Send to Claude</button>
+  </div>
+</div>
+
+</body>
+</html>
