@@ -5,7 +5,7 @@ import { appendFile, readFile } from "fs/promises";
 export interface BaseEvent {
   type: string;
   seq: number;
-  timestamp: string;
+  timestamp: number;
   replayed?: boolean;
 }
 
@@ -22,7 +22,7 @@ export interface SelectEvent extends BaseEvent {
 export interface AnnotateEvent extends BaseEvent {
   type: "annotate";
   variation: string;
-  pin: string;
+  pin: number;
   position: { x: number; y: number };
   selector: string;
   text: string;

@@ -25,7 +25,7 @@ describe("SelectEvent", () => {
       selector: "#hero",
       label: "Hero section",
       action: "like",
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
     };
     expect(event.type).toBe("select");
     expect(event.seq).toBe(1);
@@ -33,7 +33,7 @@ describe("SelectEvent", () => {
     expect(event.selector).toBe("#hero");
     expect(event.label).toBe("Hero section");
     expect(event.action).toBe("like");
-    expect(typeof event.timestamp).toBe("string");
+    expect(typeof event.timestamp).toBe("number");
   });
 
   test("action can be reject", () => {
@@ -44,7 +44,7 @@ describe("SelectEvent", () => {
       selector: ".card",
       label: "Card",
       action: "reject",
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
     };
     expect(event.action).toBe("reject");
   });
@@ -56,11 +56,11 @@ describe("AnnotateEvent", () => {
       type: "annotate",
       seq: 3,
       variation: "v1",
-      pin: "pin-1",
+      pin: 1,
       position: { x: 0.25, y: 0.75 },
       selector: ".header",
       text: "Move this up",
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
     };
     expect(event.position.x).toBeGreaterThanOrEqual(0);
     expect(event.position.x).toBeLessThanOrEqual(1);
@@ -68,6 +68,7 @@ describe("AnnotateEvent", () => {
     expect(event.position.y).toBeLessThanOrEqual(1);
     expect(event.position.x).toBe(0.25);
     expect(event.position.y).toBe(0.75);
+    expect(typeof event.pin).toBe("number");
   });
 });
 
@@ -78,7 +79,7 @@ describe("VerdictEvent", () => {
       seq: 4,
       variation: "v1",
       action: "like",
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
       reason: "Best contrast ratio",
     };
     expect(withReason.reason).toBe("Best contrast ratio");
@@ -88,7 +89,7 @@ describe("VerdictEvent", () => {
       seq: 5,
       variation: "v2",
       action: "reject",
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
     };
     expect(withoutReason.reason).toBeUndefined();
   });
@@ -118,7 +119,7 @@ describe("appendEvent", () => {
       selector: "#btn",
       label: "Button",
       action: "like",
-      timestamp: "2024-01-01T00:00:00.000Z",
+      timestamp: 1704067200000,
     };
     const e2: SelectEvent = {
       type: "select",
@@ -127,7 +128,7 @@ describe("appendEvent", () => {
       selector: "#link",
       label: "Link",
       action: "reject",
-      timestamp: "2024-01-01T00:00:01.000Z",
+      timestamp: 1704067201000,
     };
 
     await appendEvent(filePath, e1);
@@ -149,9 +150,9 @@ describe("readEvents", () => {
 
   test("parses all events from file", async () => {
     const events: SelectEvent[] = [
-      { type: "select", seq: 1, variation: "v1", selector: "#a", label: "A", action: "like", timestamp: "t1" },
-      { type: "select", seq: 2, variation: "v2", selector: "#b", label: "B", action: "reject", timestamp: "t2" },
-      { type: "select", seq: 3, variation: "v1", selector: "#c", label: "C", action: "like", timestamp: "t3" },
+      { type: "select", seq: 1, variation: "v1", selector: "#a", label: "A", action: "like", timestamp: 1 },
+      { type: "select", seq: 2, variation: "v2", selector: "#b", label: "B", action: "reject", timestamp: 2 },
+      { type: "select", seq: 3, variation: "v1", selector: "#c", label: "C", action: "like", timestamp: 3 },
     ];
 
     for (const ev of events) {
@@ -175,7 +176,7 @@ describe("countEvents", () => {
       selector: "#x",
       label: "X",
       action: "like",
-      timestamp: "t",
+      timestamp: 1,
     };
 
     expect(await countEvents(filePath)).toBe(0);
