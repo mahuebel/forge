@@ -149,17 +149,21 @@
         script.src = "/iframe-bridge.js";
         doc.body.appendChild(script);
 
-        // Size the iframe to its content — iframes don't auto-size, they
-        // stay at min-height otherwise. Since the variation HTML is served
-        // from the same origin, we can read scrollHeight directly.
+        // Size the iframe to its content. Multiple passes catch late-loading
+        // resources (fonts, images) without using a ResizeObserver — those
+        // create a feedback loop when variation content uses `min-height: 100vh`.
         resizeIframeToContent(iframe);
+        setTimeout(() => resizeIframeToContent(iframe), 100);
+        setTimeout(() => resizeIframeToContent(iframe), 500);
 
-        // Re-measure on content changes (fonts loading, images, interactions
-        // inside the variation that expand/collapse sections).
-        if (typeof ResizeObserver !== "undefined") {
-          const observer = new ResizeObserver(() => resizeIframeToContent(iframe));
-          observer.observe(doc.body);
-        }
+        // Re-measure when images inside the iframe finish loading.
+        const images = doc.querySelectorAll("img");
+        images.forEach((img) => {
+          if (!img.complete) {
+            img.addEventListener("load", () => resizeIframeToContent(iframe), { once: true });
+            img.addEventListener("error", () => resizeIframeToContent(iframe), { once: true });
+          }
+        });
       } catch (err) {
         // Cross-origin iframes will throw; ignore.
         console.warn("[forge] iframe bridge inject failed:", err);
@@ -171,13 +175,26 @@
     try {
       const doc = iframe.contentDocument;
       if (!doc || !doc.body) return;
-      // Use the larger of body and documentElement scrollHeight so padding
-      // and margins on <html> don't get clipped.
+
+      // Collapse the iframe first so vh/percent-based content in the
+      // variation (e.g. `body { min-height: 100vh }`) doesn't inflate
+      // itself to match whatever height we previously set. Without this,
+      // measuring scrollHeight yields an ever-growing value.
+      iframe.style.height = "0px";
+
+      // Force reflow so the collapsed height takes effect before we measure.
+      // Reading offsetHeight triggers layout.
+      void doc.body.offsetHeight;
+
       const height = Math.max(
         doc.body.scrollHeight,
         doc.documentElement.scrollHeight
       );
-      iframe.style.height = height + "px";
+
+      // Safety cap — if something goes wrong, don't allow multi-thousand-pixel
+      // iframes. Realistic variation content maxes out at a few thousand px.
+      const MAX_HEIGHT = 8000;
+      iframe.style.height = Math.min(height, MAX_HEIGHT) + "px";
     } catch {
       // Ignore cross-origin errors.
     }
