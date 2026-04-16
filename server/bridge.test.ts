@@ -7,8 +7,10 @@ import {
   readCursor,
   writeCursor,
   getUnsentLines,
+  createBridge,
 } from "./bridge";
-import type { SelectEvent, VerdictEvent, AnnotateEvent } from "./events";
+import type { SelectEvent, VerdictEvent, AnnotateEvent, ForgeEvent } from "./events";
+import { appendFile } from "fs/promises";
 
 let dir: string;
 
@@ -122,5 +124,88 @@ describe("getUnsentLines", () => {
     await writeFile(eventsFile, lines.join("\n") + "\n");
     const result = await getUnsentLines(eventsFile, 0);
     expect(result).toHaveLength(2);
+  });
+});
+
+// ─── createBridge integration ────────────────────────────────────────────────
+
+describe("createBridge", () => {
+  test("forwards newly-appended events via onMessage after debounce", async () => {
+    const eventsFile = join(dir, "events.jsonl");
+    const cursorFile = join(dir, "cursor");
+    await writeFile(eventsFile, "");
+    await writeFile(cursorFile, "0");
+
+    const messages: string[] = [];
+    const batches: ForgeEvent[][] = [];
+    const bridge = createBridge({
+      eventsFile,
+      cursorFile,
+      onMessage: (formatted, events) => {
+        messages.push(formatted);
+        batches.push(events);
+      },
+      debounceMs: 100,
+      pollIntervalMs: 40,
+    });
+
+    bridge.start();
+
+    // Append a verdict event
+    const e: VerdictEvent = {
+      type: "verdict",
+      seq: 1,
+      variation: "a",
+      action: "like",
+      timestamp: Date.now(),
+    };
+    await appendFile(eventsFile, JSON.stringify(e) + "\n");
+
+    // Wait for poll + debounce to fire
+    await new Promise((r) => setTimeout(r, 400));
+    bridge.stop();
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("Variation A liked");
+    expect(batches[0]).toHaveLength(1);
+    expect(bridge.getEventsSent()).toBe(1);
+
+    // Cursor should be advanced to 1
+    const cursor = await readCursor(cursorFile);
+    expect(cursor).toBe(1);
+  });
+
+  test("does not re-queue events across polls (advances cursor immediately)", async () => {
+    const eventsFile = join(dir, "events.jsonl");
+    const cursorFile = join(dir, "cursor");
+    await writeFile(eventsFile, "");
+    await writeFile(cursorFile, "0");
+
+    const messages: string[] = [];
+    const bridge = createBridge({
+      eventsFile,
+      cursorFile,
+      onMessage: (formatted) => { messages.push(formatted); },
+      debounceMs: 200, // long enough that multiple polls run before flush
+      pollIntervalMs: 30,
+    });
+
+    bridge.start();
+
+    const e: VerdictEvent = {
+      type: "verdict",
+      seq: 1,
+      variation: "b",
+      action: "reject",
+      timestamp: Date.now(),
+    };
+    await appendFile(eventsFile, JSON.stringify(e) + "\n");
+
+    // Wait longer than debounce, so multiple polls run
+    await new Promise((r) => setTimeout(r, 500));
+    bridge.stop();
+
+    expect(messages).toHaveLength(1);
+    expect(bridge.getEventsSent()).toBe(1);
   });
 });

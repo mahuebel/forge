@@ -88,7 +88,7 @@ export function createBridge(config: BridgeConfig): Bridge {
   let eventsSent = 0;
   let pendingEvents: ForgeEvent[] = [];
 
-  async function flush() {
+  function flush() {
     if (pendingEvents.length === 0) return;
     const batch = [...pendingEvents];
     pendingEvents = [];
@@ -96,9 +96,7 @@ export function createBridge(config: BridgeConfig): Bridge {
     const formatted = batch.map(formatEvent).join("\n");
     onMessage(formatted, batch);
     eventsSent += batch.length;
-
-    const cursor = await readCursor(cursorFile);
-    await writeCursor(cursorFile, cursor + batch.length);
+    debounceTimer = null;
   }
 
   async function poll() {
@@ -116,6 +114,12 @@ export function createBridge(config: BridgeConfig): Bridge {
           // skip malformed lines
         }
       }
+
+      // Advance cursor immediately so next poll doesn't re-queue the same events.
+      // If the onMessage callback fails, events are still in pendingEvents and
+      // will be flushed on the next debounce tick; recovery after crash happens
+      // via the cursor file being persisted.
+      await writeCursor(cursorFile, cursor + unsent.length);
 
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(flush, debounceMs);
