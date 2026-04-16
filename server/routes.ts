@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync, readdirSync } from "fs";
-import { appendEvent, readEvents, type ForgeEvent } from "./events";
+import { appendEvent, readEvents, type ForgeEvent, type RoundEvent } from "./events";
 import type { SessionPaths } from "./session";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -80,13 +80,10 @@ export function createRouteHandler(
       }
 
       // Last round event's round number, or 0
-      let round = 0;
-      for (let i = events.length - 1; i >= 0; i--) {
-        if (events[i].type === "round") {
-          round = (events[i] as { round: number }).round;
-          break;
-        }
-      }
+      const lastRound = events
+        .filter((e): e is RoundEvent => e.type === "round")
+        .pop();
+      const round = lastRound?.round ?? 0;
 
       return jsonResponse({ variations, round, eventCount: events.length });
     }

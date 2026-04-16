@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { join } from "path";
 import { mkdtempSync, writeFileSync } from "fs";
+import { rm } from "fs/promises";
 import { tmpdir } from "os";
 import { createSession } from "./session";
 import { createSequenceCounter } from "./events";
@@ -30,11 +31,12 @@ describe("HTTP routes", () => {
 
   afterEach(async () => {
     await server.stop();
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   // ─── GET /health ────────────────────────────────────────────────────────
 
-  it("GET /health returns 200 with status ok and uptime_s", async () => {
+  test("GET /health returns 200 with status ok and uptime_s", async () => {
     const res = await fetch(`http://localhost:${server.port}/health`);
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -44,7 +46,7 @@ describe("HTTP routes", () => {
 
   // ─── GET /api/state ─────────────────────────────────────────────────────
 
-  it("GET /api/state returns 200 with empty state for new session", async () => {
+  test("GET /api/state returns 200 with empty state for new session", async () => {
     const res = await fetch(`http://localhost:${server.port}/api/state`);
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -55,7 +57,7 @@ describe("HTTP routes", () => {
 
   // ─── GET /api/events ────────────────────────────────────────────────────
 
-  it("GET /api/events returns 200 with empty array for new session", async () => {
+  test("GET /api/events returns 200 with empty array for new session", async () => {
     const res = await fetch(`http://localhost:${server.port}/api/events`);
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -64,7 +66,7 @@ describe("HTTP routes", () => {
 
   // ─── POST /api/events ───────────────────────────────────────────────────
 
-  it("POST /api/events returns 201 with seq=1, type, and timestamp", async () => {
+  test("POST /api/events returns 201 with seq=1, type, and timestamp", async () => {
     const res = await fetch(`http://localhost:${server.port}/api/events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -77,7 +79,7 @@ describe("HTTP routes", () => {
     expect(typeof body.timestamp).toBe("number");
   });
 
-  it("POST /api/events second call returns seq=2", async () => {
+  test("POST /api/events second call returns seq=2", async () => {
     await fetch(`http://localhost:${server.port}/api/events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -93,7 +95,7 @@ describe("HTTP routes", () => {
     expect(body.seq).toBe(2);
   });
 
-  it("POST /api/events with invalid type returns 400", async () => {
+  test("POST /api/events with invalid type returns 400", async () => {
     const res = await fetch(`http://localhost:${server.port}/api/events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,7 +106,7 @@ describe("HTTP routes", () => {
 
   // ─── GET /content/:filename ─────────────────────────────────────────────
 
-  it("GET /content/:filename serves an HTML file from content dir", async () => {
+  test("GET /content/:filename serves an HTML file from content dir", async () => {
     const filename = "variation-a.html";
     writeFileSync(join(paths.content, filename), "<html>variation a</html>", "utf8");
 
@@ -114,8 +116,13 @@ describe("HTTP routes", () => {
     expect(text).toContain("variation a");
   });
 
-  it("GET /content/:filename returns 404 for missing file", async () => {
+  test("GET /content/:filename returns 404 for missing file", async () => {
     const res = await fetch(`http://localhost:${server.port}/content/nonexistent.html`);
     expect(res.status).toBe(404);
+  });
+
+  test("GET /content/:filename rejects path traversal with 403", async () => {
+    const res = await fetch(`http://localhost:${server.port}/content/..%2Fetc%2Fpasswd`);
+    expect(res.status).toBe(403);
   });
 });
