@@ -20,36 +20,69 @@ Forge gives you a browser-based workspace for generating, comparing, and refinin
 
 ## Phase 1: Setup (once per session)
 
-Check whether the workspace server is already running by looking for:
+The workspace server is launched and managed by the plugin — the developer never runs shell commands themselves. You do it all.
 
-```
-<baseDir>/.forge/sessions/*/state/server-info.json
-```
+### Step 1: Look for an existing server for this project
 
-If `server-info.json` exists and the server process is alive, skip launch and tell the developer the URL from that file.
+Use the Glob tool on pattern `.forge/sessions/*/state/server-info.json` (relative to cwd) to find any existing session info files.
 
-If not running, determine a session ID (timestamp-based, e.g. `1713200000`) and launch the server:
+For each match, use the Read tool to get the `port` field, then run:
 
 ```bash
-bun run server/index.ts --port 4546 --session 1713200000 --base $(pwd) &
+curl -sf http://localhost:<port>/health
 ```
 
-The server writes `.forge/sessions/<sessionId>/state/server-info.json` with port and URL on startup. Wait briefly, then tell the developer:
+- If the curl succeeds with `"status":"ok"` → that's this project's live server. Use the `url` and `sessionId` from that `server-info.json`. Skip to Step 3.
+- If all health checks fail or no files match → launch a new server (Step 2).
+
+### Step 2: Launch the server
+
+```bash
+bun run "${CLAUDE_PLUGIN_ROOT}/server/index.ts" --port 4546 --session "forge-$(date +%s)" --base "$(pwd)" > /tmp/forge-server.log 2>&1 &
+```
+
+**Why it looks this way:**
+- `${CLAUDE_PLUGIN_ROOT}` resolves to the plugin's installed directory. Do **not** use a relative path like `server/index.ts` — it will fail once the plugin is installed outside the user's cwd.
+- `--base "$(pwd)"` keeps session state scoped to the current project at `.forge/sessions/...`.
+- Redirecting to `/tmp/forge-server.log` keeps the log accessible. The bridge writes formatted events to stdout, so `tail -f /tmp/forge-server.log` will show them as they stream. You can also re-read the file if you miss something.
+- Default port 4546 — if it's already in use by a different project's server, the launch will fail. In that case, re-run with `--port 4547` (or whichever is free). Loop up to ~4560 before giving up.
+
+After launching, wait ~1 second and verify:
+
+```bash
+curl -sf http://localhost:4546/health
+```
+
+If this fails (Bun not installed, port conflict, crash), tell the developer:
+
+- `bun: command not found` → "Install [Bun](https://bun.sh) with `curl -fsSL https://bun.sh/install | bash`, then try `/forge` again."
+- Port conflict → pick the next port and re-launch.
+- Crash (check `/tmp/forge-server.log`) → surface the error message.
+
+Do **not** fall back to `node` — the server uses Bun-specific APIs (`Bun.serve`, `Bun.file`).
+
+### Step 3: Announce the workspace
+
+Read `server-info.json` to get the actual `url` (don't hardcode 4546; you may be on a different port):
 
 > Workspace is running at **http://localhost:4546** — open it in your browser.
 
-Session directory layout:
+### Session directory layout
+
+State lives under the developer's current project:
 
 ```
-<baseDir>/.forge/sessions/<sessionId>/
+<pwd>/.forge/sessions/<sessionId>/
   content/          ← HTML variation files you write here
   state/
     events.jsonl    ← all interaction events (source of truth)
     server.pid      ← PID of running server
-    server-info.json
+    server-info.json ← port, url, paths — read this when you need the live session id
   bridge/
     cursor          ← last successfully sent line number
 ```
+
+Whenever you need the current session's paths (e.g. to write a variation file or append a round event), read `server-info.json` from the live server's session directory rather than guessing.
 
 ---
 
