@@ -41,7 +41,7 @@ export function getSessionPaths(baseDir: string, sessionId: string): SessionPath
     bridge,
     eventsFile: join(state, "events.jsonl"),
     pidFile: join(state, "server.pid"),
-    serverInfoFile: join(state, "server.json"),
+    serverInfoFile: join(state, "server-info.json"),
     cursorFile: join(bridge, "cursor"),
   };
 }

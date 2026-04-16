@@ -44,7 +44,7 @@ describe("getSessionPaths", () => {
     expect(paths.bridge).toBe(join(sessionRoot, "bridge"));
     expect(paths.eventsFile).toBe(join(sessionRoot, "state", "events.jsonl"));
     expect(paths.pidFile).toBe(join(sessionRoot, "state", "server.pid"));
-    expect(paths.serverInfoFile).toBe(join(sessionRoot, "state", "server.json"));
+    expect(paths.serverInfoFile).toBe(join(sessionRoot, "state", "server-info.json"));
     expect(paths.cursorFile).toBe(join(sessionRoot, "bridge", "cursor"));
   });
 
@@ -185,7 +185,7 @@ describe("PID file", () => {
 
 describe("server info", () => {
   test("writeServerInfo + readServerInfo round-trip", async () => {
-    const infoPath = join(tmpDir, "server.json");
+    const infoPath = join(tmpDir, "server-info.json");
     const info: ServerInfo = {
       port: 3000,
       url: "http://localhost:3000",
@@ -207,7 +207,7 @@ describe("server info", () => {
   });
 
   test("ServerInfo has expected fields", async () => {
-    const infoPath = join(tmpDir, "server.json");
+    const infoPath = join(tmpDir, "server-info.json");
     const info: ServerInfo = {
       port: 8080,
       url: "http://localhost:8080",
