@@ -1,138 +1,291 @@
 # forge
 
-A Claude Code plugin for generating, comparing, and refining visual variations of HTML artifacts with structured, multi-granularity feedback.
+**A visual workspace for iterating on UI with Claude Code — point, comment, react, and refine in real time instead of describing changes in prose.**
 
-## What it does
+Forge turns the usual Claude loop — *"make it more compact… no, less… actually move the sidebar… wait, I meant the other sidebar…"* — into something direct. Claude generates variations, you open them in a browser, click what you like, drop pins on what needs fixing, reject what doesn't work. Your clicks stream back to Claude, and the next round lands with your feedback already baked in.
 
-When you're iterating on a UI design, architecture diagram, or any visual artifact with Claude, forge gives you an interactive browser workspace to:
+---
 
-1. **View multiple variations side by side** — Claude generates N variations; forge displays them in a browser.
-2. **Give structured feedback** — like/reject whole variations, drop numbered pins with notes, or select specific components to call out.
-3. **Stream feedback to Claude in real time** — your interactions flow back to Claude's session via a channel; Claude refines based on what you did, not a prose re-explanation.
+## Why this exists
 
-## Requirements
+Traditional Claude iteration on UI designs looks like this:
 
-- [Bun](https://bun.sh) runtime
-- Claude Code (with plugin support)
+```
+You:    Can you make 3 variations of a settings page?
+Claude: [outputs three HTML files]
+You:    I like the second one, but the toggle section is cramped,
+        and the first one's sidebar is better. Can you combine them
+        and also make the buttons bigger... wait, not those buttons,
+        the save/cancel buttons...
+Claude: [regenerates, mostly guesses what you meant]
+You:    Close, but now the spacing is weird between...
+```
 
-## Installation
+It works, but you're constantly translating visual intent into prose. Forge skips the translation:
 
-Clone and register the plugin with Claude Code:
+```
+You:    /forge 3 variations of a settings page
+Claude: Ready — open http://localhost:4546
+
+[you open the browser, look at three designs side by side]
+[you click "Like" on variation A's sidebar]
+[you drop a pin on B's toggle section: "too cramped, more spacing"]
+[you click "Reject" on variation C]
+
+You:    /forge refine
+Claude: You liked A's sidebar and flagged B's toggle spacing.
+        Here's Round 2 combining both — open the browser again.
+```
+
+The difference: Claude gets structured feedback (selectors, positions, verdicts) instead of imprecise prose. You stay in visual flow.
+
+---
+
+## Quick start
+
+### 1. Install [Bun](https://bun.sh) (if you haven't)
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+### 2. Add the plugin to Claude Code
 
 ```bash
 git clone https://github.com/mahuebel/forge.git
-cd forge
-claude plugin add .
+claude plugin add ./forge
 ```
 
-## Usage
+### 3. Use it
 
 In any Claude Code session:
 
 ```
-/forge 3 variations of a settings page with tabs and a dark theme
+/forge 3 variations of a pricing page with monthly/yearly toggle
 ```
 
-Or without an argument — Claude will ask what to generate:
+Claude starts the workspace server, writes three HTML files, and tells you the URL. Open it in your browser — the rest is clicking.
+
+That's the whole setup. You never run the Bun server yourself.
+
+---
+
+## What you see in the browser
+
+### Grid View (for comparing components)
+
+Three panels side by side. Each loads a variation in an iframe for full style isolation. Hover to highlight, click the header buttons to like or reject the whole variation.
 
 ```
-/forge
+┌──────────────────────────────────────────────────────────────┐
+│  ⚒ forge    "3 variations of a pricing page..."  ● Live      │
+├──────────────────────────────────────────────────────────────┤
+│  Select  Annotate   👍 👎   |   Grid | Full                  │
+├──────────────┬──────────────┬──────────────────────────────┤
+│ A — Basic    │ B — Featured │ C — Side-by-side              │
+│  [ iframe ]  │  [ iframe ]  │  [ iframe ]                   │
+│     ✓  ✗    │     ✓  ✗    │     ✓  ✗                       │
+└──────────────┴──────────────┴──────────────────────────────┘
+│  Selected: 1   Annotations: 0   Rejected: 1      [ Refine ] │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-Claude will:
-1. Start the workspace server (once per session)
-2. Generate HTML variation files into the session's content directory
-3. Tell you to open `http://localhost:4546`
+### Full View (for comparing full pages)
 
-From there, you interact in the browser. Your feedback streams back to Claude automatically.
+One variation takes the full viewport; a chip bar lets you switch between them; a notes sidebar collects every pin you've dropped.
 
-## The workspace
+```
+┌──────────────────────────────────────────────────────────────┐
+│  ⚒ forge    "Dashboard variations..."    ● Live              │
+│  Variations:  [ A — Clinical ✓ ] [ B — Analytics ] [ C ✗ ]   │
+├───────────────────────────────────────────────────┬──────────┤
+│                                                   │  Notes & │
+│              [ active variation iframe ]          │  Pins    │
+│                     📌1                           │          │
+│                                                   │ Pin #1   │
+│                              📌2                  │  A: Fix  │
+│                                                   │  spacing │
+│                                                   │          │
+└───────────────────────────────────────────────────┴──────────┘
+```
 
-### Two viewing modes
+See [docs/superpowers/specs/mockups/forge-grid-view.html](docs/superpowers/specs/mockups/forge-grid-view.html) and [forge-full-view.html](docs/superpowers/specs/mockups/forge-full-view.html) for the pixel-perfect renders — open them in a browser.
 
-- **Grid View** — compare smaller artifacts side by side (components, cards, widgets, form layouts)
-- **Full View** — view one full-page variation at a time with a chip bar to switch between them and a notes sidebar showing all annotations
+---
 
-Toggle between them via the buttons in the toolbar.
+## The three interaction modes
 
-### Three interaction modes
+Click the toolbar to switch between them. All interactions stream structured events back to Claude.
 
-- **Select** — click a component inside a variation to identify it. Claude gets a CSS selector, a human-readable label, and your like/reject verdict.
-- **Annotate** — click a spot on a variation to drop a numbered pin. Type a note. The pin and note stream back to Claude along with the variation and approximate position.
-- **Verdict** — like or reject an entire variation via the panel header (Grid View) or chip (Full View). Optionally add a reason.
+### Select mode
 
-### Feedback bar
+Click any component inside a variation. Forge walks up the DOM to the nearest meaningful element (semantic tag, class, or data attribute) and sends Claude a CSS selector, a human-readable label, and your like/reject verdict.
 
-Shows running counts of liked, annotated, and rejected variations. Buttons:
+> `[forge] Component on Variation A liked: "Revenue stat card" (.stat-card:nth-child(2))`
 
-- **Clear All** — reset all verdicts and annotations in the current round
-- **Refine** — signal Claude you're ready for a new round
-- **Send to Claude** (fallback) — if the channel drops, copies your event summary to the clipboard for you to paste in the terminal
+Use it when you want to call out a specific piece rather than the whole variation.
 
-### Channel status
+### Annotate mode
 
-The badge in the top bar shows the connection state:
+Click anywhere to drop a numbered pin. Type a note. Claude sees the variation, approximate position, and your note.
 
-- `● Channel Live` (green) — events streaming
-- `● Reconnecting...` (yellow) — bridge retrying
-- `● Disconnected — feedback queued` (red) — events captured locally; "Send to Claude" button appears
+> `[forge] Annotation on Variation B (pin #2, near .chart-area): "Needs a time range picker"`
 
-Events are always written to disk first, so nothing is lost even if the connection drops.
+In Full View, pins collect in the right-side Notes panel for easy scanning.
+
+### Verdict mode
+
+Like or reject an entire variation via the panel header (Grid View) or chip (Full View). Optionally add a reason.
+
+> `[forge] Variation C rejected: "Too stripped down — losing important context at a glance"`
+
+---
+
+## The feedback loop
+
+1. **Claude generates** N variations into the session's content directory
+2. **You interact** in the browser (like/reject, annotate, select)
+3. **Events stream** to Claude via a local channel (real-time, debounced)
+4. **Claude acknowledges** verdicts and annotations immediately; silently accumulates component selections
+5. **You ask to refine** — in the terminal or via the workspace's Refine button — and Claude generates Round 2 incorporating everything
+6. **Repeat** until you say "go with A" or "finalize the composite"
+7. **Claude writes** the final result as actual project files matching your stack (React, Vue, plain HTML, whatever you're using)
+
+### Never lose feedback
+
+The workspace writes every interaction to `events.jsonl` on disk before anything else happens. If the channel to Claude drops:
+
+- The badge turns yellow (reconnecting), then red (disconnected)
+- A **Send to Claude** button appears — one click copies the event summary to your clipboard
+- When the channel reconnects, unsent events replay automatically
+- Nothing is lost, ever
+
+---
+
+## Troubleshooting
+
+**`bun: command not found` when running `/forge`**
+Install Bun: `curl -fsSL https://bun.sh/install | bash`, then try again. Forge uses `Bun.serve` and `Bun.file` which aren't available in Node.js.
+
+**Port 4546 is already in use**
+Another forge server (from a different project, maybe) is running there. Either:
+- Stop it: `kill $(lsof -t -i:4546)`
+- Or let Claude launch on the next free port — it handles this automatically.
+
+**The browser badge shows red "Disconnected"**
+The bridge isn't forwarding events. Check that `/tmp/forge-server.log` is being written to. Use the **Send to Claude** button as a fallback — paste the copied summary in your terminal and Claude processes it the same way.
+
+**Variations show blank in the iframe**
+Check the content directory: `ls .forge/sessions/*/content/`. If files exist but render blank, they may be malformed HTML. Open one directly in a browser to debug.
+
+**Can I run forge in multiple projects at the same time?**
+Yes. Each project gets its own `.forge/sessions/` directory and Claude picks an unused port per project.
+
+---
+
+## Under the hood
+
+Forge is three pieces working together:
+
+| Piece | What it does |
+|-------|--------------|
+| **The skill** (`skills/forge/SKILL.md`) | Tells Claude how to generate variations, respond to events, and produce final artifacts |
+| **The workspace server** (Bun, `server/index.ts`) | Serves the browser SPA, watches the content directory, POSTs events to JSONL |
+| **The channel bridge** (`server/bridge.ts`) | Tails `events.jsonl`, formats events, streams them to Claude with debounce, replay, and heartbeat |
+
+The event stream (`events.jsonl`) is the single source of truth. Every click appends one line. Sequence numbers let Claude detect gaps. Heartbeats every 15s catch silent bridge failures. The cursor file enables replay from the last-sent position if the bridge reconnects.
+
+Three-layer progression (after [this workflow pattern](docs/superpowers/specs/claude_code_three_layers_review.md)):
+
+1. **Static** — Claude writes HTML you can look at
+2. **Interactive** — the HTML becomes a tool you can manipulate, emitting structured events
+3. **Channels loop** — events stream back to Claude live, so use-of-tool becomes the prompt
+
+---
+
+## Session layout
+
+When forge runs, state lives under your current project:
+
+```
+<your-project>/.forge/sessions/<sessionId>/
+  content/              HTML variation files (round-1-a.html, round-1-b.html, …)
+  state/
+    events.jsonl        interaction events, one per line (source of truth)
+    server.pid          running server's PID
+    server-info.json    port, URL, paths
+  bridge/
+    cursor              last-sent line number (for replay on reconnect)
+```
+
+Everything is local. No network calls, no external services. The plugin only needs Bun and a browser.
+
+---
 
 ## Development
 
-### Running the server directly
+If you want to hack on forge itself:
 
 ```bash
+git clone https://github.com/mahuebel/forge.git
+cd forge
+
+# Run the test suite
+bun test
+
+# Run the server directly (bypassing the plugin setup)
 bun run server/index.ts --port 4546 --session dev --base "$(pwd)"
 ```
-
-Arguments:
-- `--port` — HTTP port (default 4546)
-- `--session` — session identifier (default `forge-<timestamp>`)
-- `--base` — base directory for the session state (default current working directory)
-
-The server creates a session directory at `<base>/.forge/sessions/<session>/` containing:
-- `content/` — HTML variation files
-- `state/events.jsonl` — event stream (source of truth)
-- `state/server-info.json` — server URL and paths
-- `state/server.pid` — server process ID
-- `bridge/cursor` — last-sent line marker for channel replay
-
-### Running tests
-
-```bash
-bun test
-```
-
-All server-side modules have tests under `server/*.test.ts`. The browser-side code (interactions.js, iframe-bridge.js) is verified manually.
 
 ### Project structure
 
 ```
 forge/
-  .claude-plugin/plugin.json    Plugin manifest
+  .claude-plugin/plugin.json      plugin manifest
   server/
-    index.ts                    Bun server entry point (wires HTTP, WS, watcher, bridge, heartbeat)
-    events.ts                   Event types, JSONL utilities, sequence counter
-    session.ts                  Session directory management, PID file, server info
-    routes.ts                   HTTP route handlers
-    watcher.ts                  Content directory file watcher
-    bridge.ts                   Channel bridge (tail events.jsonl, format, debounce)
-    health.ts                   Heartbeat emitter
-    public/                     Browser-side SPA (workspace.html, styles.css, interactions.js, iframe-bridge.js)
-  skills/forge/SKILL.md         The prompt Claude follows on /forge
+    index.ts                      Bun server entry (wires everything)
+    events.ts                     event types, JSONL utilities
+    session.ts                    session directory management, PID file, server info
+    routes.ts                     HTTP route handlers (/health, /api/state, /api/events, static)
+    watcher.ts                    content directory file watcher
+    bridge.ts                     channel bridge (tail events.jsonl, format, debounce)
+    health.ts                     heartbeat emitter
+    public/                       browser SPA
+      workspace.html              shell (top bar, toolbar, grid/full views, feedback bar)
+      styles.css                  dark theme
+      interactions.js             state mgmt, rendering, interaction handlers, WebSocket, health polling
+      iframe-bridge.js            injected into variation iframes for DOM inspection via postMessage
+  skills/forge/SKILL.md           the prompt Claude follows when /forge runs
+  docs/superpowers/
+    specs/2026-04-15-forge-design.md    full design spec
+    specs/mockups/                      pixel-perfect HTML mockups of grid and full view
+    plans/2026-04-15-forge.md           the implementation plan this was built from
 ```
 
-## How it works
+### Tests
 
-Under the hood, forge is a three-component system:
+Server-side modules are covered by `bun test`. The browser-side code (`interactions.js`, `iframe-bridge.js`) is verified end-to-end by running the server and exercising the workspace manually.
 
-1. **The skill** — tells Claude how to generate variations, respond to events, and produce final artifacts
-2. **The workspace server (Bun)** — serves the browser SPA, watches for new variation files, and bridges events to Claude's session
-3. **The channel bridge** — tails the event stream and pushes formatted messages to Claude in real time (with debounce, heartbeat, and automatic replay on reconnect)
+```bash
+bun test                                # all tests
+bun test server/bridge.test.ts          # just the bridge
+```
 
-The event stream (`events.jsonl`) is the single source of truth. Every browser interaction appends one line. Sequence numbers let Claude detect gaps. Heartbeats detect silent failures. Cursors enable replay.
+---
+
+## What's next
+
+v0.1 deliberately keeps scope tight. Out of scope for now:
+
+- Persistence across Claude Code sessions (event history is per-conversation)
+- Collaborative use (single developer, single browser tab)
+- Export to Figma or other design tools (output is HTML → project files)
+- Custom themes (ships with one dark theme)
+- Plugin marketplace distribution
+
+If you have ideas, open an issue or PR at [github.com/mahuebel/forge](https://github.com/mahuebel/forge).
+
+---
 
 ## License
 
