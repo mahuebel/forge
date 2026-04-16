@@ -1,0 +1,6 @@
+{
+  "name": "forge",
+  "description": "Visual variation workspace — generate, compare, and refine UI designs and architecture diagrams with structured feedback",
+  "version": "0.1.0",
+  "skills": ["skills/forge"]
+}
