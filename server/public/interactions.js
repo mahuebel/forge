@@ -148,11 +148,39 @@
         const script = doc.createElement("script");
         script.src = "/iframe-bridge.js";
         doc.body.appendChild(script);
+
+        // Size the iframe to its content — iframes don't auto-size, they
+        // stay at min-height otherwise. Since the variation HTML is served
+        // from the same origin, we can read scrollHeight directly.
+        resizeIframeToContent(iframe);
+
+        // Re-measure on content changes (fonts loading, images, interactions
+        // inside the variation that expand/collapse sections).
+        if (typeof ResizeObserver !== "undefined") {
+          const observer = new ResizeObserver(() => resizeIframeToContent(iframe));
+          observer.observe(doc.body);
+        }
       } catch (err) {
         // Cross-origin iframes will throw; ignore.
         console.warn("[forge] iframe bridge inject failed:", err);
       }
     });
+  }
+
+  function resizeIframeToContent(iframe) {
+    try {
+      const doc = iframe.contentDocument;
+      if (!doc || !doc.body) return;
+      // Use the larger of body and documentElement scrollHeight so padding
+      // and margins on <html> don't get clipped.
+      const height = Math.max(
+        doc.body.scrollHeight,
+        doc.documentElement.scrollHeight
+      );
+      iframe.style.height = height + "px";
+    } catch {
+      // Ignore cross-origin errors.
+    }
   }
 
   // ─── Rendering ─────────────────────────────────────────────────────────────
