@@ -389,9 +389,17 @@ body[data-view="full"] .full-view {
   display: block;
   padding: 24px;
   padding-bottom: 60px;
-  max-width: 1100px;
-  margin: 0 auto;
   margin-right: 300px;
+}
+
+/* When in full view, the fixed notes panel covers the right 300px of the
+ * viewport at z-index 30. Without this padding, top bar / toolbar / chip
+ * bar content (including the Grid/Full toggle pushed to the right by
+ * margin-left: auto) is rendered BEHIND the notes panel and unreachable. */
+body[data-view="full"] .topbar,
+body[data-view="full"] .toolbar,
+body[data-view="full"] .chip-bar {
+  padding-right: 320px;
 }
 
 .full-view-content {

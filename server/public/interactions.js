@@ -92,9 +92,22 @@
           .sort((a, b) => a.variation.localeCompare(b.variation));
       }
 
-      // Replay events to rebuild statuses, annotations, round/prompt
+      // Replay events to rebuild statuses, annotations, round/prompt.
+      //
+      // Annotations and verdicts are scoped to the CURRENT round: any
+      // feedback from earlier rounds is cleared when a new round event
+      // is encountered. Claude still has full history via the channel /
+      // hook / events.jsonl, but the workspace UI shouldn't carry stale
+      // pins and like/reject marks onto freshly-generated variations —
+      // those refer to designs that no longer exist on screen.
       for (const ev of events) {
-        if (ev.type === "verdict") {
+        if (ev.type === "round") {
+          state.round = ev.round;
+          state.prompt = ev.prompt || "";
+          state.annotations = [];
+          state.pinCounter = 0;
+          for (const v of state.variations) v.status = "default";
+        } else if (ev.type === "verdict") {
           const v = findVariation(ev.variation);
           if (v) {
             v.status = ev.action === "like" ? "liked" : "rejected";
@@ -110,9 +123,6 @@
           if (typeof ev.pin === "number" && ev.pin > state.pinCounter) {
             state.pinCounter = ev.pin;
           }
-        } else if (ev.type === "round") {
-          state.round = ev.round;
-          state.prompt = ev.prompt || "";
         }
       }
 
