@@ -225,4 +225,39 @@ describe("server info", () => {
     expect(result?.contentDir).toBe("/base/.forge/sessions/test-session/content");
     expect(result?.eventsFile).toBe("/base/.forge/sessions/test-session/state/events.jsonl");
   });
+
+  test("claudePid round-trips through server-info", async () => {
+    const infoPath = join(tmpDir, "server-info.json");
+    const info: ServerInfo = {
+      port: 4546,
+      url: "http://localhost:4546",
+      sessionId: "forge-owned",
+      contentDir: "/base/content",
+      eventsFile: "/base/events.jsonl",
+      version: "0.3.3",
+      claudePid: 98765,
+    };
+
+    await writeServerInfo(infoPath, info);
+    const result = await readServerInfo(infoPath);
+
+    expect(result?.claudePid).toBe(98765);
+    expect(result?.version).toBe("0.3.3");
+  });
+
+  test("claudePid is optional for legacy compatibility", async () => {
+    const infoPath = join(tmpDir, "server-info.json");
+    const info: ServerInfo = {
+      port: 4546,
+      url: "http://localhost:4546",
+      sessionId: "forge-legacy",
+      contentDir: "/base/content",
+      eventsFile: "/base/events.jsonl",
+    };
+
+    await writeServerInfo(infoPath, info);
+    const result = await readServerInfo(infoPath);
+
+    expect(result?.claudePid).toBeUndefined();
+  });
 });

@@ -22,12 +22,15 @@ const { values } = parseArgs({
     port: { type: "string", default: "4546" },
     session: { type: "string", default: "forge-" + Date.now() },
     base: { type: "string", default: process.cwd() },
+    "claude-pid": { type: "string" },
   },
 });
 
 const port = parseInt(values.port!, 10);
 const sessionId = values.session!;
 const baseDir = values.base!;
+const claudePidArg = values["claude-pid"];
+const claudePid = claudePidArg ? parseInt(claudePidArg, 10) : undefined;
 
 // publicDir is co-located with this index.ts: server/public
 const publicDir = join(import.meta.dir, "public");
@@ -102,6 +105,7 @@ const serverInfo = {
   contentDir: paths.content,
   eventsFile: paths.eventsFile,
   version: pluginVersion,
+  claudePid,
 };
 await writeServerInfo(paths.serverInfoFile, serverInfo);
 

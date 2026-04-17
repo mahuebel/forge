@@ -60,6 +60,13 @@ export interface ServerInfo {
    * the running server needs to be restarted. Optional for backward
    * compatibility with server-info.json written by pre-0.3.1 servers. */
   version?: string;
+  /** PID of the Claude Code process that owns this workspace. The channel
+   * MCP server and the UserPromptSubmit hook both use `process.ppid` (which
+   * equals the parent Claude Code process's PID) to filter workspaces and
+   * avoid cross-session misdelivery when multiple Claude sessions are open.
+   * Optional for backward compatibility; legacy workspaces without this
+   * field are treated as unowned. */
+  claudePid?: number;
 }
 
 // ─── Path construction ───────────────────────────────────────────────────────

@@ -42,12 +42,44 @@ import { join } from "path";
 const ACTIVE_SESSIONS_DIR = join(homedir(), ".claude", "forge", "active-sessions");
 const POLL_INTERVAL_MS = 300;
 
+// The PID of our parent process. When Claude Code spawns this MCP server via
+// .mcp.json, the parent is the Claude Code process itself. The forge HTTP
+// server records the same PID in its server-info.json (passed in via
+// --claude-pid "$PPID" from the skill's bash launch, where $PPID is also the
+// Claude Code PID for the same reason). Matching on this value is how we
+// route events to the correct Claude session when multiple are running.
+const OWNER_PID = process.ppid;
+
 interface SessionInfo {
   port: number;
   url: string;
   sessionId: string;
   contentDir: string;
   eventsFile: string;
+  claudePid?: number;
+}
+
+function isLivePid(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function shouldOwn(info: SessionInfo): boolean {
+  // Strict match: only claim workspaces explicitly tagged with our PID.
+  // Legacy (pre-0.3.3) workspaces without `claudePid` are ignored here —
+  // the developer must restart them via the skill for the new routing to
+  // take effect. Lenient claiming (adopting unowned workspaces) would
+  // regress the original multi-session misdelivery bug.
+  if (typeof info.claudePid !== "number") return false;
+  if (info.claudePid !== OWNER_PID) return false;
+  // Belt-and-suspenders: if somehow our PPID reused a slot from a long-dead
+  // Claude that had launched this workspace, refuse to adopt.
+  if (!isLivePid(info.claudePid)) return false;
+  return true;
 }
 
 // --- Track which sessions we're tailing and how far we've pushed ------------
@@ -63,7 +95,7 @@ const tracked = new Map<string, TrackedSession>();
 // --- MCP Server --------------------------------------------------------------
 
 const mcp = new Server(
-  { name: "forge", version: "0.3.2" },
+  { name: "forge", version: "0.3.3" },
   {
     capabilities: {
       experimental: { "claude/channel": {} },
@@ -261,9 +293,12 @@ async function startTracking(info: SessionInfo): Promise<void> {
   if (tracked.has(info.sessionId)) return;
 
   // Cursor file lives in the session's bridge/ directory, next to the
-  // main bridge cursor but distinct.
+  // main bridge cursor but distinct. We include OWNER_PID in the name so
+  // that even if two channel-server processes somehow end up tracking the
+  // same workspace (they shouldn't, given shouldOwn), they can't race each
+  // other to advance a shared cursor and cause misdelivery.
   const sessionRoot = info.eventsFile.replace(/\/state\/events\.jsonl$/, "");
-  const cursorFile = join(sessionRoot, "bridge", "channel-cursor");
+  const cursorFile = join(sessionRoot, "bridge", "channel-cursor-" + OWNER_PID);
 
   if (!existsSync(cursorFile)) {
     try {
@@ -298,6 +333,7 @@ async function scanActiveSessions(): Promise<void> {
     if (!name.endsWith(".json")) continue;
     const info = await loadSessionInfo(join(ACTIVE_SESSIONS_DIR, name));
     if (!info) continue;
+    if (!shouldOwn(info)) continue;
     seen.add(info.sessionId);
     if (!tracked.has(info.sessionId)) {
       await startTracking(info);

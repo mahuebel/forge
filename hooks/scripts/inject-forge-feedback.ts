@@ -68,10 +68,28 @@ async function main() {
 
 async function processSession(sessionDir: string): Promise<string | null> {
   const eventsFile = join(sessionDir, "state", "events.jsonl");
-  const cursorFile = join(sessionDir, "bridge", "injected-cursor");
   const serverInfoFile = join(sessionDir, "state", "server-info.json");
 
   if (!existsSync(eventsFile)) return null;
+
+  // Ownership check: only inject feedback from workspaces owned by THIS
+  // Claude session. process.ppid here is the Claude Code PID, which matches
+  // the claudePid recorded in server-info.json when the workspace was
+  // launched via the skill. Skipping unowned workspaces prevents the hook
+  // from stealing events that should go to another Claude session open in
+  // the same project directory. Legacy workspaces (no claudePid) are
+  // skipped — they must be restarted to participate in per-session routing.
+  let serverInfo: { url?: string; claudePid?: number } = {};
+  if (existsSync(serverInfoFile)) {
+    try {
+      serverInfo = JSON.parse(await readFile(serverInfoFile, "utf-8"));
+    } catch {}
+  }
+  if (serverInfo.claudePid !== process.ppid) return null;
+
+  // Cursor file is per-Claude-session (keyed by ppid) so two Claudes in the
+  // same project can't race each other to advance a shared cursor.
+  const cursorFile = join(sessionDir, "bridge", "injected-cursor-" + process.ppid);
 
   const cursor = existsSync(cursorFile)
     ? parseInt((await readFile(cursorFile, "utf-8")).trim(), 10) || 0
@@ -104,16 +122,7 @@ async function processSession(sessionDir: string): Promise<string | null> {
   // Advance cursor to end of file so we don't re-inject
   await writeFile(cursorFile, String(allLines.length));
 
-  // Get server url if available
-  let url = "";
-  if (existsSync(serverInfoFile)) {
-    try {
-      const info = JSON.parse(await readFile(serverInfoFile, "utf-8"));
-      url = info.url ?? "";
-    } catch {}
-  }
-
-  return formatEventsAsContext(events, url);
+  return formatEventsAsContext(events, serverInfo.url ?? "");
 }
 
 interface FormattableEvent {

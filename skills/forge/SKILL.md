@@ -32,10 +32,16 @@ For each match, use the Read tool to get the `port` field, then run:
 curl -sf http://localhost:<port>/health
 ```
 
-If it succeeds with `"status":"ok"`, also check the `version` field in the response against the current plugin version. Read the current plugin version from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`.
+If it succeeds with `"status":"ok"`, check two more fields on the matched `server-info.json`:
 
-- **Health ok AND version matches** → this project's live server is current. Use the `url` and `sessionId` from that `server-info.json`. Skip to Step 3.
-- **Health ok BUT version differs** (or the `/health` response has no `version` field — that means it's a pre-0.3.1 server) → the plugin was updated but the running server is stale. Kill it and relaunch:
+1. **Version match** — compare the `/health` response's `version` against the current plugin version (read from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`).
+2. **Ownership match** — compare `server-info.json`'s `claudePid` against `$PPID` (this bash shell's parent, which is the Claude Code process running this session). This is how forge avoids cross-session event misdelivery when multiple Claude sessions are open.
+
+Reuse / relaunch decision:
+
+- **Health ok AND version matches AND `claudePid == $PPID`** → reuse this workspace. Use the `url` and `sessionId` from that `server-info.json`. Skip to Step 3.
+- **Health ok BUT `claudePid` missing, or set to a different PID** → another Claude session (or a pre-0.3.3 server) owns this workspace. Do **not** kill it — it may be in active use by that other Claude. Launch a fresh workspace for this session instead (Step 2). Multiple workspaces per project is fine; each is namespaced under its own `.forge/sessions/<id>/` directory.
+- **Health ok, ownership matches, version differs** (or `/health` has no `version` field — pre-0.3.1 server) → plugin was updated; relaunch:
 
   ```bash
   # Read the pid from server-info.json, then:
@@ -50,12 +56,13 @@ If it succeeds with `"status":"ok"`, also check the `version` field in the respo
 ### Step 2: Launch the server
 
 ```bash
-bun run "${CLAUDE_PLUGIN_ROOT}/server/index.ts" --port 4546 --session "forge-$(date +%s)" --base "$(pwd)" > /tmp/forge-server.log 2>&1 &
+bun run "${CLAUDE_PLUGIN_ROOT}/server/index.ts" --port 4546 --session "forge-$(date +%s)" --base "$(pwd)" --claude-pid "$PPID" > /tmp/forge-server.log 2>&1 &
 ```
 
 **Why it looks this way:**
 - `${CLAUDE_PLUGIN_ROOT}` resolves to the plugin's installed directory. Do **not** use a relative path like `server/index.ts` — it will fail once the plugin is installed outside the user's cwd.
 - `--base "$(pwd)"` keeps session state scoped to the current project at `.forge/sessions/...`.
+- `--claude-pid "$PPID"` tags the workspace with the current Claude Code process's PID. The channel MCP server and the UserPromptSubmit hook both read this field to route events only to the Claude session that owns the workspace. **You must pass this — without it, running forge in multiple Claude sessions causes events to be delivered to the wrong session.** `$PPID` inside this bash command is the Claude Code process because Claude runs bash commands as direct children.
 - Redirecting to `/tmp/forge-server.log` keeps the log accessible. The bridge writes formatted events to stdout, so `tail -f /tmp/forge-server.log` will show them as they stream. You can also re-read the file if you miss something.
 - Default port 4546 — if it's already in use by a different project's server, the launch will fail. In that case, re-run with `--port 4547` (or whichever is free). Loop up to ~4560 before giving up.
 
