@@ -69,7 +69,64 @@ describe("formatEvent", () => {
     };
     const result = formatEvent(event);
     expect(result).toContain("pin #2");
+    expect(result).toContain("near .chart");
     expect(result).toContain("Needs a legend");
+  });
+
+  test("prefixes the topic when topic_id is present", () => {
+    const event: AnnotateEvent = {
+      type: "annotate",
+      seq: 1,
+      timestamp: Date.now(),
+      topic_id: "dashboard",
+      variation: "a",
+      pin: 1,
+      position: { x: 0, y: 0 },
+      selector: ".stat",
+      text: "Too dense",
+    };
+    const result = formatEvent(event);
+    expect(result).toContain("[topic: dashboard]");
+    expect(result).toContain("Variation A");
+  });
+
+  test("formats general-note annotate event", () => {
+    const event: AnnotateEvent = {
+      type: "annotate",
+      seq: 5,
+      timestamp: Date.now(),
+      variation: "",
+      pin: 4,
+      position: { x: 0, y: 0 },
+      selector: "",
+      text: "Overall tone is too corporate",
+      shape: "general",
+    };
+    const result = formatEvent(event);
+    expect(result).toContain("General note");
+    expect(result).toContain("#4");
+    expect(result).toContain("too corporate");
+    expect(result).not.toContain("Variation");
+  });
+
+  test("formats area-shaped annotate event", () => {
+    const event: AnnotateEvent = {
+      type: "annotate",
+      seq: 4,
+      timestamp: Date.now(),
+      variation: "a",
+      pin: 3,
+      position: { x: 0.4, y: 0.3 },
+      selector: "",
+      text: "Cluttered region",
+      shape: "area",
+      bounds: { x: 0.3, y: 0.2, w: 0.2, h: 0.2 },
+    };
+    const result = formatEvent(event);
+    expect(result).toContain("pin #3");
+    expect(result).toContain("area 20%×20%");
+    expect(result).toContain("(30%, 20%)");
+    expect(result).toContain("Cluttered region");
   });
 });
 

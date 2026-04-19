@@ -138,6 +138,8 @@ interface FormattableEvent {
   variations?: string[];
   prompt?: string;
   note?: string;
+  shape?: string;
+  topic_id?: string;
 }
 
 function formatEventsAsContext(events: FormattableEvent[], url: string): string {
@@ -151,31 +153,36 @@ function formatEventsAsContext(events: FormattableEvent[], url: string): string 
   const wantsRefine = events.some((e) => e.type === "refine");
 
   for (const e of events) {
+    const topic = typeof e.topic_id === "string" ? `[${e.topic_id}] ` : "";
     switch (e.type) {
       case "verdict": {
         const v = (e.variation ?? "?").toUpperCase();
         const action = e.action === "like" ? "liked" : "rejected";
         const reason = e.reason ? ` — "${e.reason}"` : "";
-        lines.push(`- Variation ${v} ${action}${reason}`);
+        lines.push(`- ${topic}Variation ${v} ${action}${reason}`);
         break;
       }
       case "annotate": {
-        const v = (e.variation ?? "?").toUpperCase();
-        lines.push(`- Annotation on Variation ${v} (pin #${e.pin}, near \`${e.selector}\`): "${e.text}"`);
+        if (e.shape === "general" || !e.variation) {
+          lines.push(`- ${topic}General note (#${e.pin}): "${e.text}"`);
+        } else {
+          const v = (e.variation ?? "?").toUpperCase();
+          lines.push(`- ${topic}Annotation on Variation ${v} (pin #${e.pin}, near \`${e.selector}\`): "${e.text}"`);
+        }
         break;
       }
       case "select": {
         const v = (e.variation ?? "?").toUpperCase();
         const action = e.action === "like" ? "liked" : "rejected";
-        lines.push(`- Component on Variation ${v} ${action}: "${e.label}" (\`${e.selector}\`)`);
+        lines.push(`- ${topic}Component on Variation ${v} ${action}: "${e.label}" (\`${e.selector}\`)`);
         break;
       }
       case "round": {
-        lines.push(`- Round ${e.round} generated: variations ${(e.variations ?? []).join(", ")} — prompt: "${e.prompt}"`);
+        lines.push(`- ${topic}Round ${e.round} generated: variations ${(e.variations ?? []).join(", ")} — prompt: "${e.prompt}"`);
         break;
       }
       case "refine": {
-        lines.push("- Developer clicked **Refine** — they want a new round based on accumulated feedback.");
+        lines.push(`- ${topic}Developer clicked **Refine** — they want a new round based on accumulated feedback.`);
         break;
       }
     }

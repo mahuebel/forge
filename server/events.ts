@@ -7,6 +7,11 @@ export interface BaseEvent {
   seq: number;
   timestamp: number;
   replayed?: boolean;
+  /** Topic this event belongs to within the session. Added in 0.4.0 so a
+   * single server can host many concurrent `/forge` workspaces. Events
+   * written before topics were introduced omit this field; consumers
+   * should treat a missing value as the "default" topic. */
+  topic_id?: string;
 }
 
 // ─── Domain events ─────────────────────────────────────────────────────────
@@ -17,15 +22,37 @@ export interface SelectEvent extends BaseEvent {
   selector: string;
   label: string;
   action: "like" | "reject";
+  /** Round this event belongs to. Added in 0.3.4 so the workspace UI can
+   * scope verdicts/annotations/selects to the current round without
+   * relying on in-order replay of the round reset event. Optional for
+   * backward compatibility with events written before this field existed. */
+  round?: number;
 }
 
 export interface AnnotateEvent extends BaseEvent {
   type: "annotate";
   variation: string;
   pin: number;
+  /** Click position as a fraction (0..1) of the overlay container.
+   * Retained as a fallback for rendering when `selector` can't be
+   * resolved against the current iframe document. */
   position: { x: number; y: number };
   selector: string;
   text: string;
+  /** See SelectEvent.round. */
+  round?: number;
+  /** Click offset within the resolved element, as fractions of the
+   * element's bounding box. Added in 0.3.4 so pins can re-anchor to the
+   * clicked element when the iframe reflows (e.g. on Grid↔Full view
+   * switch, which resizes the iframe and re-lays out the content). */
+  offset?: { fx: number; fy: number };
+  /** "point" (default/legacy, single pin) or "area" (drag-selected region).
+   * "general" reserved for batch 4 — notes with no spatial anchor. */
+  shape?: "point" | "area" | "general";
+  /** For shape === "area": the selected region as fractions (0..1) of the
+   * iframe's content dimensions at drag time. Rendered by mapping to
+   * current content dimensions, so areas track reflow proportionally. */
+  bounds?: { x: number; y: number; w: number; h: number };
 }
 
 export interface VerdictEvent extends BaseEvent {
@@ -33,6 +60,8 @@ export interface VerdictEvent extends BaseEvent {
   variation: string;
   action: "like" | "reject";
   reason?: string;
+  /** See SelectEvent.round. */
+  round?: number;
 }
 
 export interface RoundEvent extends BaseEvent {

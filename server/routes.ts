@@ -2,6 +2,14 @@ import { join } from "path";
 import { existsSync, readdirSync } from "fs";
 import { appendEvent, readEvents, type ForgeEvent, type RoundEvent } from "./events";
 import type { SessionPaths } from "./session";
+import {
+  DEFAULT_TOPIC_ID,
+  createTopic,
+  isValidTopicId,
+  readRegistry,
+  setActiveTopic,
+  topicContentDir,
+} from "./topics";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,6 +46,17 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 const VALID_TYPES = new Set(["select", "annotate", "verdict", "refine"]);
 
+// ─── Topic helpers ────────────────────────────────────────────────────────────
+
+function topicOf(e: ForgeEvent): string {
+  return e.topic_id ?? DEFAULT_TOPIC_ID;
+}
+
+async function activeTopicId(paths: SessionPaths): Promise<string> {
+  const reg = await readRegistry(paths.root);
+  return reg?.activeId ?? DEFAULT_TOPIC_ID;
+}
+
 // ─── Content-type map for static files ───────────────────────────────────────
 
 function contentTypeForExt(filename: string): string {
@@ -72,31 +91,95 @@ export function createRouteHandler(
       });
     }
 
-    // GET /api/state
-    if (method === "GET" && pathname === "/api/state") {
-      const events = await readEvents(paths.eventsFile);
+    // GET /api/topics
+    if (method === "GET" && pathname === "/api/topics") {
+      const registry = await readRegistry(paths.root);
+      if (!registry) {
+        return jsonResponse({ topics: [], activeId: DEFAULT_TOPIC_ID });
+      }
+      return jsonResponse(registry);
+    }
 
-      // Sorted .html filenames in content dir
+    // POST /api/topics — create a new topic
+    if (method === "POST" && pathname === "/api/topics") {
+      let body: { id?: unknown; title?: unknown; prompt?: unknown };
+      try {
+        body = (await req.json()) as typeof body;
+      } catch {
+        return jsonResponse({ error: "Invalid JSON" }, 400);
+      }
+      if (typeof body.title !== "string" || !body.title.trim()) {
+        return jsonResponse({ error: "title required" }, 400);
+      }
+      try {
+        const result = await createTopic(paths.root, {
+          id: typeof body.id === "string" ? body.id : undefined,
+          title: body.title,
+          prompt: typeof body.prompt === "string" ? body.prompt : undefined,
+        });
+        return jsonResponse(
+          { topic: result.topic, contentDir: result.contentDir },
+          201
+        );
+      } catch (err) {
+        return jsonResponse({ error: (err as Error).message }, 409);
+      }
+    }
+
+    // POST /api/topics/active — switch active topic
+    if (method === "POST" && pathname === "/api/topics/active") {
+      let body: { id?: unknown };
+      try {
+        body = (await req.json()) as typeof body;
+      } catch {
+        return jsonResponse({ error: "Invalid JSON" }, 400);
+      }
+      if (!isValidTopicId(body.id)) {
+        return jsonResponse({ error: "invalid topic id" }, 400);
+      }
+      const reg = await setActiveTopic(paths.root, body.id);
+      if (!reg) return jsonResponse({ error: "unknown topic" }, 404);
+      return jsonResponse(reg);
+    }
+
+    // GET /api/state?topic=X
+    if (method === "GET" && pathname === "/api/state") {
+      const topicParam = url.searchParams.get("topic");
+      const topicId = isValidTopicId(topicParam) ? topicParam : await activeTopicId(paths);
+
+      const allEvents = await readEvents(paths.eventsFile);
+      const events = allEvents.filter((e) => topicOf(e) === topicId);
+
       let variations: string[] = [];
-      if (existsSync(paths.content)) {
-        variations = readdirSync(paths.content)
+      const contentDir = topicContentDir(paths.root, topicId);
+      if (existsSync(contentDir)) {
+        variations = readdirSync(contentDir)
           .filter((f) => f.endsWith(".html"))
           .sort();
       }
 
-      // Last round event's round number, or 0
       const lastRound = events
         .filter((e): e is RoundEvent => e.type === "round")
         .pop();
       const round = lastRound?.round ?? 0;
 
-      return jsonResponse({ variations, round, eventCount: events.length });
+      return jsonResponse({
+        topicId,
+        variations,
+        round,
+        eventCount: events.length,
+      });
     }
 
-    // GET /api/events
+    // GET /api/events?topic=X
     if (method === "GET" && pathname === "/api/events") {
-      const events = await readEvents(paths.eventsFile);
-      return jsonResponse(events);
+      const topicParam = url.searchParams.get("topic");
+      const all = await readEvents(paths.eventsFile);
+      if (!topicParam) return jsonResponse(all);
+      if (!isValidTopicId(topicParam)) {
+        return jsonResponse({ error: "invalid topic id" }, 400);
+      }
+      return jsonResponse(all.filter((e) => topicOf(e) === topicParam));
     }
 
     // POST /api/events
@@ -112,8 +195,20 @@ export function createRouteHandler(
         return jsonResponse({ error: "Invalid event type" }, 400);
       }
 
+      // Normalize topic_id: keep a valid one, otherwise stamp with the
+      // current active topic. Pre-topic clients that omit the field end
+      // up on whichever topic is currently active, which matches what a
+      // user would expect when interacting with the UI.
+      let topicId: string;
+      if (isValidTopicId(body.topic_id)) {
+        topicId = body.topic_id;
+      } else {
+        topicId = await activeTopicId(paths);
+      }
+
       const event: ForgeEvent = {
         ...body,
+        topic_id: topicId,
         seq: getNextSeq(),
         timestamp: Date.now(),
       } as ForgeEvent;
@@ -139,20 +234,36 @@ export function createRouteHandler(
       return jsonResponse({ ok: true });
     }
 
-    // GET /content/:filename
+    // GET /content/<topicId>/<filename> (0.4.0+) or /content/<filename>
+    // (pre-0.4.0 fallback — served from the default topic dir after the
+    // one-time migration in ensureRegistry).
     if (method === "GET" && pathname.startsWith("/content/")) {
-      const filename = pathname.slice("/content/".length);
-
-      // Reject path traversal attempts
-      if (filename.includes("..") || filename.includes("/")) {
+      const rest = pathname.slice("/content/".length);
+      if (rest.includes("..")) {
         return new Response("Forbidden", { status: 403, headers: CORS_HEADERS });
       }
 
-      const filePath = join(paths.content, filename);
-      if (!existsSync(filePath)) {
+      const parts = rest.split("/");
+      let filePath: string;
+      if (parts.length === 2) {
+        const [topicId, filename] = parts;
+        if (!isValidTopicId(topicId) || filename.includes("/")) {
+          return new Response("Forbidden", { status: 403, headers: CORS_HEADERS });
+        }
+        filePath = join(topicContentDir(paths.root, topicId), filename);
+      } else if (parts.length === 1) {
+        const filename = parts[0];
+        if (filename.includes("/")) {
+          return new Response("Forbidden", { status: 403, headers: CORS_HEADERS });
+        }
+        filePath = join(topicContentDir(paths.root, DEFAULT_TOPIC_ID), filename);
+      } else {
         return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
       }
 
+      if (!existsSync(filePath)) {
+        return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+      }
       return new Response(Bun.file(filePath), {
         status: 200,
         headers: {

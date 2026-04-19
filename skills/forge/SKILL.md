@@ -80,11 +80,40 @@ If this fails (Bun not installed, port conflict, crash), tell the developer:
 
 Do **not** fall back to `node` — the server uses Bun-specific APIs (`Bun.serve`, `Bun.file`).
 
-### Step 3: Announce the workspace
+### Step 3: Create a topic
+
+Each `/forge` invocation is a **topic** within the session — its own prompt, rounds, variations, and feedback. A single server can host many topics side-by-side, so re-invoking `/forge` in the same Claude session never needs a new server or port.
+
+Create a topic by POSTing to the workspace:
+
+```bash
+curl -sf -X POST "$WORKSPACE_URL/api/topics" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Provider dashboard","prompt":"3 variations of a provider dashboard"}'
+```
+
+Response (201):
+
+```json
+{
+  "topic": { "id": "provider-dashboard", "title": "Provider dashboard", "createdAt": 1713200000000 },
+  "contentDir": "/abs/path/.forge/sessions/<sessionId>/content/provider-dashboard"
+}
+```
+
+You get back the `topic.id` (slugified from title if you don't supply one) and the absolute `contentDir` to write variation files into. Remember the `topic.id` — every round/annotate/verdict/select event you emit for this invocation must carry `topic_id`.
+
+If the developer re-invokes `/forge` in this same Claude session, **create a new topic** rather than writing more rounds into the existing one. The workspace auto-shows a tab bar when more than one topic exists; the developer can switch between them.
+
+### Step 4: Announce the workspace
 
 Read `server-info.json` to get the actual `url` (don't hardcode 4546; you may be on a different port):
 
 > Workspace is running at **http://localhost:4546** — open it in your browser.
+
+If you created a new topic in an existing workspace, mention it:
+
+> Added a new topic "Provider dashboard" to your running forge workspace — it's a new tab at the top.
 
 ### Session directory layout
 
@@ -92,16 +121,19 @@ State lives under the developer's current project:
 
 ```
 <pwd>/.forge/sessions/<sessionId>/
-  content/          ← HTML variation files you write here
+  content/
+    <topicId>/      ← HTML variation files written here, one dir per topic
+      round-1-a.html
   state/
-    events.jsonl    ← all interaction events (source of truth)
-    server.pid      ← PID of running server
-    server-info.json ← port, url, paths — read this when you need the live session id
+    events.jsonl    ← all interaction events (source of truth); every event tagged with topic_id
+    topics.json     ← topic registry: [{id, title, createdAt, prompt?}] + activeId
+    server.pid
+    server-info.json
   bridge/
-    cursor          ← last successfully sent line number
+    cursor
 ```
 
-Whenever you need the current session's paths (e.g. to write a variation file or append a round event), read `server-info.json` from the live server's session directory rather than guessing.
+Whenever you need to write a variation, read the `contentDir` returned by `POST /api/topics` (or compute `<sessionRoot>/content/<topicId>/`). Whenever you append a round event, include `"topic_id": "<topicId>"` at the top level of the JSON line.
 
 ---
 
@@ -109,7 +141,7 @@ Whenever you need the current session's paths (e.g. to write a variation file or
 
 ### File naming
 
-Write files to `<baseDir>/.forge/sessions/<sessionId>/content/` using this convention:
+Write files to the topic's `contentDir` — absolute path returned by `POST /api/topics` — using this convention:
 
 ```
 round-1-a.html
@@ -118,7 +150,7 @@ round-1-c.html
 round-2-a.html   ← second round after refinement
 ```
 
-Round numbers increment with each generation pass. Letters start from `a`.
+Round numbers increment with each generation pass within a topic; they reset to 1 when you start a new topic. Letters start from `a`.
 
 ### What each variation must be
 
@@ -132,11 +164,12 @@ Round numbers increment with each generation pass. Letters start from `a`.
 After writing the variation files, append one line to `<baseDir>/.forge/sessions/<sessionId>/state/events.jsonl`:
 
 ```json
-{"type":"round","seq":0,"round":1,"variations":["a","b","c"],"prompt":"3 variations of a provider dashboard with dark theme","timestamp":1713200030}
+{"type":"round","topic_id":"provider-dashboard","seq":0,"round":1,"variations":["a","b","c"],"prompt":"3 variations of a provider dashboard with dark theme","timestamp":1713200030}
 ```
 
+- `topic_id`: the topic this round belongs to — must match the slug returned by `POST /api/topics`. Without it, events fall back to the currently-active topic which may not be yours.
 - `seq`: always write `0` — the bridge assigns ordering by file position
-- `round`: increment with each generation pass
+- `round`: increment with each generation pass **within this topic** (rounds are per-topic, not global)
 - `variations`: array of letter strings matching the files you wrote
 - `timestamp`: `Date.now()` in milliseconds (Unix millis, not seconds)
 
@@ -293,13 +326,19 @@ When you receive pasted event data, process it exactly the same as streamed even
 
 ---
 
-## Multiple /forge Sessions
+## Multiple /forge Invocations
 
-The server stays running across `/forge` invocations in the same conversation. Each new invocation:
+The server stays running across `/forge` invocations in the same Claude session. Each new invocation becomes its own **topic** in the running workspace:
 
-- Reuses the running server (check `server-info.json` first, don't relaunch)
-- Starts a new round sequence from `round-1-*`
-- Preserves all prior rounds' events in `events.jsonl`
+- Reuse the existing server (check `server-info.json` first — do not relaunch)
+- `POST /api/topics` to allocate a new topic, its content directory, and its slug
+- Start a new round sequence from `round-1-*` **inside that topic's `contentDir`**
+- Stamp every event with the new `topic_id`
+- Prior topics' rounds and feedback remain untouched on disk and in the UI — they're just other tabs in the workspace
+
+The workspace shows a tab strip at the top of the page when more than one topic is active. Switching tabs swaps which topic's variations and annotations are visible; events continue to stream for whichever topic is currently active in the browser. When Claude receives a channel event, the `topic_id` meta attribute tells you which topic it belongs to — always write refinements back to that topic's `contentDir`.
+
+When the Claude session ends, the server shuts down automatically — the SessionEnd hook sends SIGTERM to any server tagged with this Claude's PID, and the server itself runs an orphan watchdog that polls its owning Claude pid every 10s as a fallback for crashes or kill -9. You don't need to clean up servers manually.
 
 If an earlier topic comes up, you can reference its events:
 > In your earlier forge session you liked the dark sidebar pattern — want me to carry that into this round?

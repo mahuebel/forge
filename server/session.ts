@@ -67,6 +67,11 @@ export interface ServerInfo {
    * Optional for backward compatibility; legacy workspaces without this
    * field are treated as unowned. */
   claudePid?: number;
+  /** PID of the server process itself. The SessionEnd hook reads this
+   * from the active-sessions registry to send SIGTERM directly without
+   * having to walk per-project session directories. Optional for
+   * backward compatibility. */
+  serverPid?: number;
 }
 
 // ─── Path construction ───────────────────────────────────────────────────────

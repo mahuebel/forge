@@ -184,6 +184,47 @@ body {
    4. Chip bar
    ============================================================ */
 
+.topic-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 20px;
+  background: var(--bg-inset);
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+}
+
+/* Hide the topic tabs entirely when only the default topic exists, so
+ * the workspace looks identical to the pre-0.4.0 layout for single-topic
+ * sessions. The class is toggled in interactions.js. */
+.topic-tabs.single {
+  display: none;
+}
+
+.topic-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 10px 14px;
+  margin: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.topic-tab:hover {
+  color: var(--text-primary);
+}
+
+.topic-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
 .chip-bar {
   display: none; /* hidden in grid view */
   align-items: center;
@@ -529,6 +570,18 @@ body[data-view="full"] .notes-panel {
   color: var(--text-muted);
 }
 
+.notes-input-submit {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.note-item.general .note-variation {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border-primary);
+}
+
 /* ============================================================
    8. Annotation pins + tooltip + highlight
    ============================================================ */
@@ -605,6 +658,42 @@ body[data-mode="annotate"] .interaction-overlay {
 
 body[data-mode="select"] .interaction-overlay {
   cursor: pointer;
+}
+
+body[data-mode="area"] .interaction-overlay {
+  cursor: crosshair;
+}
+
+.annotation-area {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  background: rgba(249, 115, 22, 0.12);
+  pointer-events: none;
+  z-index: 8;
+}
+
+.annotation-area.dragging {
+  border-style: dashed;
+  background: rgba(249, 115, 22, 0.06);
+}
+
+.annotation-area-label {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.4);
+  pointer-events: auto;
 }
 
 /* ============================================================

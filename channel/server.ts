@@ -109,10 +109,10 @@ const mcp = new Server(
       "- type=\"verdict\": acknowledge immediately, note what worked or didn't",
       "- type=\"annotate\": acknowledge the note, confirm it's queued for the next round",
       "- type=\"select\": accumulate silently, don't reply per click",
-      "- type=\"refine\": generate the next round of variations incorporating all accumulated feedback. Write files named round-N-{a,b,c}.html to the contentDir attribute, then append a round event to eventsFile.",
+      "- type=\"refine\": generate the next round of variations incorporating all accumulated feedback. Write files named round-N-{a,b,c}.html to <contentDir>/<topic_id>/, then append a round event (with the same topic_id) to eventsFile.",
       "- type=\"round\": informational, don't reply",
       "",
-      "The `session_id` attribute identifies which forge session the event came from. If there are multiple active forge sessions, use it to disambiguate.",
+      "The `session_id` attribute identifies which forge session the event came from. The `topic_id` attribute (when present) identifies which `/forge` invocation within that session — a single session can host many topics side-by-side. Always scope file writes and round events to the event's topic_id.",
       "",
       "You can call the `notify-workspace` tool to show a toast message in the developer's browser (useful when acknowledging a refine request before you've finished writing the new round).",
     ].join("\n"),
@@ -250,6 +250,7 @@ async function pushEvent(sessionId: string, event: Record<string, unknown>): Pro
   if (typeof event.action === "string") meta.action = event.action;
   if (typeof event.pin === "number") meta.pin = String(event.pin);
   if (typeof event.round === "number") meta.round = String(event.round);
+  if (typeof event.topic_id === "string") meta.topic_id = event.topic_id;
 
   const content = formatEventBody(event);
 
@@ -261,28 +262,34 @@ async function pushEvent(sessionId: string, event: Record<string, unknown>): Pro
 
 function formatEventBody(event: Record<string, unknown>): string {
   const type = event.type;
+  const topicPrefix = typeof event.topic_id === "string"
+    ? `[topic: ${event.topic_id}] `
+    : "";
   switch (type) {
     case "verdict": {
       const v = String(event.variation ?? "?").toUpperCase();
       const action = event.action === "like" ? "liked" : "rejected";
       const reason = event.reason ? ` — "${event.reason}"` : "";
-      return `Variation ${v} ${action}${reason}`;
+      return `${topicPrefix}Variation ${v} ${action}${reason}`;
     }
     case "annotate": {
       const v = String(event.variation ?? "?").toUpperCase();
-      return `Annotation on Variation ${v} (pin #${event.pin}, near ${event.selector}): "${event.text}"`;
+      if (event.shape === "general" || !event.variation) {
+        return `${topicPrefix}General note (#${event.pin}): "${event.text}"`;
+      }
+      return `${topicPrefix}Annotation on Variation ${v} (pin #${event.pin}, near ${event.selector}): "${event.text}"`;
     }
     case "select": {
       const v = String(event.variation ?? "?").toUpperCase();
       const action = event.action === "like" ? "liked" : "rejected";
-      return `Component on Variation ${v} ${action}: "${event.label}" (${event.selector})`;
+      return `${topicPrefix}Component on Variation ${v} ${action}: "${event.label}" (${event.selector})`;
     }
     case "round": {
       const vs = (event.variations as string[] | undefined) ?? [];
-      return `Round ${event.round} generated: variations ${vs.join(", ")}. Prompt: "${event.prompt}"`;
+      return `${topicPrefix}Round ${event.round} generated: variations ${vs.join(", ")}. Prompt: "${event.prompt}"`;
     }
     case "refine": {
-      return "Developer clicked Refine. Generate the next round of variations incorporating all accumulated feedback — reference specific likes, annotations, and rejections, then write the new round's HTML files and append a round event to the events file.";
+      return `${topicPrefix}Developer clicked Refine. Generate the next round of variations incorporating all accumulated feedback — reference specific likes, annotations, and rejections, then write the new round's HTML files and append a round event to the events file.`;
     }
     default:
       return JSON.stringify(event);

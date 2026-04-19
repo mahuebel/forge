@@ -26,6 +26,9 @@
   <button class="tool-btn" data-mode="annotate" title="Drop annotation pins">
     <span class="tool-icon">📌</span> Annotate
   </button>
+  <button class="tool-btn" data-mode="area" title="Drag to annotate a region">
+    <span class="tool-icon">▭</span> Area
+  </button>
   <div class="toolbar-divider"></div>
   <button class="tool-btn" id="btn-like-all" title="Like all selected">
     <span class="tool-icon">👍</span>
@@ -39,6 +42,8 @@
     <button class="view-toggle-btn" data-view="full">Full</button>
   </div>
 </nav>
+
+<div class="topic-tabs" id="topic-tabs"></div>
 
 <div class="chip-bar" id="chip-bar">
   <span class="chip-bar-label">Variations</span>
@@ -56,7 +61,8 @@
   </div>
   <div class="notes-list" id="notes-list"></div>
   <div class="notes-input-area">
-    <textarea class="notes-input" id="general-note" placeholder="Add a general note..."></textarea>
+    <textarea class="notes-input" id="general-note" placeholder="Add a general note (⌘/Ctrl+Enter to submit)..."></textarea>
+    <button class="forge-btn forge-btn-primary notes-input-submit" id="general-note-submit">Add note</button>
   </div>
 </aside>
 

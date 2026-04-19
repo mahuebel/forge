@@ -1,5 +1,5 @@
 {
-  "description": "Injects unprocessed forge workspace feedback into the developer's next prompt",
+  "description": "Injects unprocessed forge workspace feedback into the developer's next prompt and shuts down owned forge servers when the session ends",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -7,6 +7,17 @@
           {
             "type": "command",
             "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/inject-forge-feedback.ts",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/shutdown-forge-server.ts",
             "timeout": 5
           }
         ]

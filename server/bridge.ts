@@ -5,22 +5,40 @@ import type { ForgeEvent } from "./events";
 // --- Event formatting ---
 
 export function formatEvent(event: ForgeEvent): string {
+  // Every non-heartbeat event carries a topic. When the default topic is
+  // the only one in play the prefix is noise, but callers that care can
+  // strip it — keeping it uniform here simplifies Claude's parsing.
+  const topic = event.topic_id && event.type !== "heartbeat"
+    ? `[topic: ${event.topic_id}] `
+    : "";
   switch (event.type) {
     case "select":
-      return `[forge] Component on Variation ${event.variation.toUpperCase()} ${event.action === "like" ? "liked" : "rejected"}: "${event.label}" (${event.selector})`;
-    case "annotate":
-      return `[forge] Annotation on Variation ${event.variation.toUpperCase()} (pin #${event.pin}, near ${event.selector}):\n"${event.text}"`;
+      return `[forge] ${topic}Component on Variation ${event.variation.toUpperCase()} ${event.action === "like" ? "liked" : "rejected"}: "${event.label}" (${event.selector})`;
+    case "annotate": {
+      if (event.shape === "general" || !event.variation) {
+        return `[forge] ${topic}General note (#${event.pin}):\n"${event.text}"`;
+      }
+      const variation = event.variation.toUpperCase();
+      if (event.shape === "area" && event.bounds) {
+        const pct = (n: number) => Math.round(n * 100);
+        const b = event.bounds;
+        const loc = `area ${pct(b.w)}%×${pct(b.h)}% at (${pct(b.x)}%, ${pct(b.y)}%)`;
+        return `[forge] ${topic}Annotation on Variation ${variation} (pin #${event.pin}, ${loc}):\n"${event.text}"`;
+      }
+      const near = event.selector ? `, near ${event.selector}` : "";
+      return `[forge] ${topic}Annotation on Variation ${variation} (pin #${event.pin}${near}):\n"${event.text}"`;
+    }
     case "verdict": {
       const reasonText = event.reason ? `\n"${event.reason}"` : "";
-      return `[forge] Variation ${event.variation.toUpperCase()} ${event.action === "like" ? "liked" : "rejected"}:${reasonText}`;
+      return `[forge] ${topic}Variation ${event.variation.toUpperCase()} ${event.action === "like" ? "liked" : "rejected"}:${reasonText}`;
     }
     case "round":
-      return `[forge] Round ${event.round} generated: variations ${event.variations.join(", ")}\nPrompt: "${event.prompt}"`;
+      return `[forge] ${topic}Round ${event.round} generated: variations ${event.variations.join(", ")}\nPrompt: "${event.prompt}"`;
     case "heartbeat":
       return `[forge:heartbeat] uptime=${event.server_uptime_s}s events_sent=${event.events_sent}`;
     case "refine": {
       const noteText = event.note ? ` — "${event.note}"` : "";
-      return `[forge] Developer requested refinement${noteText}`;
+      return `[forge] ${topic}Developer requested refinement${noteText}`;
     }
     default:
       return `[forge] Unknown event: ${JSON.stringify(event)}`;

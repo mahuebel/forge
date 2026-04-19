@@ -9,12 +9,28 @@
     mode: "select",         // "select" | "annotate"
     variations: [],         // [{filename, round, variation, status}]
     activeVariation: null,  // letter
-    annotations: [],        // [{pin, variation, position, selector, text}]
+    annotations: [],        // [{pin, variation, round, position, selector, text}]
     pinCounter: 0,
     connected: false,
     round: 0,
     prompt: "",
+    // Topics layer (0.4.0+): a single server can host many concurrent
+    // `/forge` workspaces. Each tab here is a topic; state below
+    // (variations, annotations, round, prompt) reflects the active one.
+    topics: [],              // [{id, title, createdAt}]
+    activeTopic: "default",
   };
+
+  // Ephemeral state for the annotate flow: between the overlay click and
+  // the submit of the input popup, the iframe asynchronously sends back a
+  // selector + offset. The message listener patches this object; submit()
+  // reads from it when building the final annotation.
+  let pendingAnnotateClick = null;
+  let annotateClickSeq = 0;
+
+  // Ephemeral state for area-drag annotations. Set on mousedown in area
+  // mode, updated on mousemove, consumed on mouseup.
+  let areaDrag = null;
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -29,7 +45,9 @@
   }
 
   function annotationsFor(letter) {
-    return state.annotations.filter((a) => a.variation === letter);
+    return state.annotations.filter(
+      (a) => a.variation === letter && a.round === state.round
+    );
   }
 
   function clearChildren(el) {
@@ -40,10 +58,11 @@
 
   async function postEvent(eventData) {
     try {
+      const payload = { topic_id: state.activeTopic, ...eventData };
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(eventData),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         console.error("[forge] postEvent failed:", res.status);
@@ -53,11 +72,51 @@
     }
   }
 
+  async function fetchTopics() {
+    try {
+      const res = await fetch("/api/topics");
+      if (!res.ok) return;
+      const data = await res.json();
+      state.topics = data.topics || [];
+      // Preserve the client's current selection if it still exists.
+      // Claude creating a new topic server-side flips the server's
+      // activeId to that new topic; we don't want that to drag the
+      // developer out of the tab they're reading.
+      const stillPresent = state.topics.some((t) => t.id === state.activeTopic);
+      if (!stillPresent) {
+        state.activeTopic = data.activeId || "default";
+      }
+    } catch (err) {
+      console.error("[forge] fetchTopics error:", err);
+    }
+  }
+
+  async function switchTopic(topicId) {
+    if (!topicId || topicId === state.activeTopic) return;
+    state.activeTopic = topicId;
+    // Best-effort server-side active-topic update. If the server doesn't
+    // know about this topic we just keep the client choice.
+    fetch("/api/topics/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: topicId }),
+    }).catch(() => { /* ignore */ });
+    renderTopicTabs();
+    await loadState();
+  }
+
   async function loadState() {
     try {
+      // Refresh topic list on every load — a new `/forge` invocation
+      // from Claude creates a topic via HTTP, and we want the tab bar
+      // to reflect it without waiting for the WS reload.
+      await fetchTopics();
+      renderTopicTabs();
+
+      const topic = encodeURIComponent(state.activeTopic);
       const [stateRes, eventsRes] = await Promise.all([
-        fetch("/api/state"),
-        fetch("/api/events"),
+        fetch("/api/state?topic=" + topic),
+        fetch("/api/events?topic=" + topic),
       ]);
       const apiState = await stateRes.json();
       const events = await eventsRes.json();
@@ -100,6 +159,11 @@
       // hook / events.jsonl, but the workspace UI shouldn't carry stale
       // pins and like/reject marks onto freshly-generated variations —
       // those refer to designs that no longer exist on screen.
+      // Round on events is optional for backward compatibility. When
+      // absent, treat the event as belonging to the round implied by
+      // replay order (state.round at the moment it's encountered). This
+      // preserves the old reset-on-round behavior for legacy data while
+      // letting new events be scoped by data, not by ordering.
       for (const ev of events) {
         if (ev.type === "round") {
           state.round = ev.round;
@@ -107,7 +171,13 @@
           state.annotations = [];
           state.pinCounter = 0;
           for (const v of state.variations) v.status = "default";
-        } else if (ev.type === "verdict") {
+          continue;
+        }
+
+        const evRound = typeof ev.round === "number" ? ev.round : state.round;
+        if (evRound !== state.round) continue;
+
+        if (ev.type === "verdict") {
           const v = findVariation(ev.variation);
           if (v) {
             v.status = ev.action === "like" ? "liked" : "rejected";
@@ -116,8 +186,12 @@
           state.annotations.push({
             pin: ev.pin,
             variation: ev.variation,
+            round: evRound,
             position: ev.position,
-            selector: ev.selector,
+            selector: ev.selector || "",
+            offset: ev.offset || null,
+            shape: ev.shape || "point",
+            bounds: ev.bounds || null,
             text: ev.text,
           });
           if (typeof ev.pin === "number" && ev.pin > state.pinCounter) {
@@ -276,22 +350,22 @@
     content.className = "panel-content";
 
     const iframe = document.createElement("iframe");
-    iframe.src = "/content/" + v.filename;
+    iframe.src = "/content/" + encodeURIComponent(state.activeTopic) + "/" + v.filename;
     iframe.setAttribute("sandbox", "allow-same-origin allow-scripts");
     injectIframeBridge(iframe);
     content.appendChild(iframe);
 
     const overlay = document.createElement("div");
     overlay.className = "interaction-overlay";
-    overlay.addEventListener("click", (e) => {
-      handleOverlayClick(e, v.variation, content);
-    });
+    attachOverlayHandlers(overlay, v.variation, content);
     content.appendChild(overlay);
 
     panel.appendChild(content);
 
-    // Render annotation pins for this variation
+    // Render annotation pins for this variation (initial, pre-load pass
+    // uses fallback positioning; wirePinRerender re-runs post-load).
     renderAnnotationsOnPanel(content, v.variation);
+    wirePinRerender(iframe, content, v.variation);
 
     return panel;
   }
@@ -300,6 +374,30 @@
     renderChipBar();
     renderFullContent();
     renderNotesSidebar();
+  }
+
+  function renderTopicTabs() {
+    const bar = document.getElementById("topic-tabs");
+    if (!bar) return;
+    clearChildren(bar);
+
+    // Collapse when only the default topic is in play — no point showing
+    // a tab strip with a single item.
+    const showTabs =
+      state.topics.length > 1 ||
+      (state.topics.length === 1 && state.topics[0].id !== "default");
+    bar.classList.toggle("single", !showTabs);
+    if (!showTabs) return;
+
+    for (const t of state.topics) {
+      const btn = document.createElement("button");
+      btn.className = "topic-tab";
+      if (t.id === state.activeTopic) btn.classList.add("active");
+      btn.textContent = t.title || t.id;
+      btn.title = t.id;
+      btn.addEventListener("click", () => switchTopic(t.id));
+      bar.appendChild(btn);
+    }
   }
 
   function renderChipBar() {
@@ -343,19 +441,18 @@
     if (!v) return;
 
     const iframe = document.createElement("iframe");
-    iframe.src = "/content/" + v.filename;
+    iframe.src = "/content/" + encodeURIComponent(state.activeTopic) + "/" + v.filename;
     iframe.setAttribute("sandbox", "allow-same-origin allow-scripts");
     injectIframeBridge(iframe);
     container.appendChild(iframe);
 
     const overlay = document.createElement("div");
     overlay.className = "interaction-overlay";
-    overlay.addEventListener("click", (e) => {
-      handleOverlayClick(e, v.variation, container);
-    });
+    attachOverlayHandlers(overlay, v.variation, container);
     container.appendChild(overlay);
 
     renderAnnotationsOnPanel(container, v.variation);
+    wirePinRerender(iframe, container, v.variation);
   }
 
   function renderNotesSidebar() {
@@ -364,27 +461,30 @@
     clearChildren(list);
 
     for (const a of state.annotations) {
+      const isGeneral = a.shape === "general" || !a.variation;
       const item = document.createElement("div");
-      item.className = "note-item";
+      item.className = isGeneral ? "note-item general" : "note-item";
 
       const meta = document.createElement("div");
       meta.className = "note-meta";
 
       const pinRef = document.createElement("span");
       pinRef.className = "note-pin-ref";
-      pinRef.textContent = "Pin #" + a.pin;
+      pinRef.textContent = "Note #" + a.pin;
       meta.appendChild(pinRef);
 
       const varLabel = document.createElement("span");
       varLabel.className = "note-variation";
-      varLabel.textContent = "Variation " + a.variation.toUpperCase();
+      varLabel.textContent = isGeneral
+        ? "General"
+        : "Variation " + a.variation.toUpperCase();
       meta.appendChild(varLabel);
 
       item.appendChild(meta);
 
       const text = document.createElement("div");
       text.className = "note-text";
-      const v = findVariation(a.variation);
+      const v = isGeneral ? null : findVariation(a.variation);
       if (v && v.status === "rejected") text.classList.add("struck");
       text.textContent = a.text;
       item.appendChild(text);
@@ -394,42 +494,339 @@
   }
 
   function renderAnnotationsOnPanel(container, variation) {
-    // Remove existing pins
-    const existing = container.querySelectorAll(".annotation-pin");
-    existing.forEach((el) => el.remove());
+    // Remove existing pins and area rects
+    container
+      .querySelectorAll(".annotation-pin, .annotation-area")
+      .forEach((el) => el.remove());
+
+    const iframe = container.querySelector("iframe");
+    const containerRect = container.getBoundingClientRect();
 
     for (const a of annotationsFor(variation)) {
+      if (a.shape === "area" && a.bounds) {
+        renderAreaAnnotation(container, a);
+        continue;
+      }
       const pin = document.createElement("div");
       pin.className = "annotation-pin";
       pin.textContent = String(a.pin);
-      pin.style.left = (a.position.x * 100) + "%";
-      pin.style.top = (a.position.y * 100) + "%";
       pin.title = a.text;
+
+      const resolved = resolvePinPosition(iframe, container, containerRect, a);
+      if (resolved) {
+        pin.style.left = resolved.left + "px";
+        pin.style.top = resolved.top + "px";
+      } else {
+        // Fallback: container-fraction positioning. This is the
+        // pre-0.3.4 behavior — visible but may dislodge from the
+        // original element across view switches.
+        pin.style.left = (a.position.x * 100) + "%";
+        pin.style.top = (a.position.y * 100) + "%";
+      }
       container.appendChild(pin);
     }
   }
 
+  function renderAreaAnnotation(container, a) {
+    const rect = document.createElement("div");
+    rect.className = "annotation-area";
+    rect.style.left = (a.bounds.x * 100) + "%";
+    rect.style.top = (a.bounds.y * 100) + "%";
+    rect.style.width = (a.bounds.w * 100) + "%";
+    rect.style.height = (a.bounds.h * 100) + "%";
+    rect.title = a.text;
+
+    const label = document.createElement("div");
+    label.className = "annotation-area-label";
+    label.textContent = String(a.pin);
+    rect.appendChild(label);
+
+    container.appendChild(rect);
+  }
+
+  // Computes a pin's pixel position within the container by resolving the
+  // annotation's stored selector against the current iframe DOM, then
+  // adding the stored offset-within-element. Same-origin iframe access
+  // means this is synchronous. Returns null when the selector can't be
+  // resolved (iframe not loaded, element missing, or legacy annotation
+  // with no selector).
+  function resolvePinPosition(iframe, container, containerRect, a) {
+    if (!iframe || !a.selector || !a.offset) return null;
+    const doc = iframe.contentDocument;
+    if (!doc) return null;
+    let el = null;
+    try {
+      el = doc.querySelector(a.selector);
+    } catch {
+      return null;
+    }
+    if (!el) return null;
+
+    const elRect = el.getBoundingClientRect();
+    const iframeRect = iframe.getBoundingClientRect();
+
+    // Element rect is in the iframe's viewport coords; translate to the
+    // container's coord system. The overlay container is `position:
+    // relative` and the iframe fills it, so this lands the pin exactly
+    // where the element sits on screen, regardless of reflow.
+    const left =
+      (iframeRect.left - containerRect.left) +
+      elRect.left +
+      a.offset.fx * elRect.width;
+    const top =
+      (iframeRect.top - containerRect.top) +
+      elRect.top +
+      a.offset.fy * elRect.height;
+
+    return { left, top };
+  }
+
+  // Attaches a load listener that re-renders pins after the iframe
+  // content finishes laying out. Called from both grid and full builders.
+  // The pin-render path is idempotent, so multiple calls are safe.
+  function wirePinRerender(iframe, container, variation) {
+    const rerender = () => renderAnnotationsOnPanel(container, variation);
+    iframe.addEventListener("load", () => {
+      rerender();
+      // Content may reflow when resizeIframeToContent runs at 100ms/500ms;
+      // schedule pin re-renders after those settle.
+      setTimeout(rerender, 150);
+      setTimeout(rerender, 600);
+    });
+  }
+
   // ─── Interaction handlers ──────────────────────────────────────────────────
+
+  // Wires click (select/annotate modes) and drag (area mode) on the
+  // overlay. The overlay is recreated on every render, so handlers are
+  // always fresh — no cleanup needed.
+  function attachOverlayHandlers(overlay, variation, container) {
+    overlay.addEventListener("click", (e) => {
+      if (state.mode === "area") return; // area uses drag, not click
+      handleOverlayClick(e, variation, container);
+    });
+    overlay.addEventListener("mousedown", (e) => {
+      if (state.mode !== "area") return;
+      if (e.button !== 0) return;
+      e.preventDefault();
+      startAreaDrag(e, variation, container, overlay);
+    });
+  }
+
+  function startAreaDrag(event, variation, container, overlay) {
+    const rect = container.getBoundingClientRect();
+    const startX = event.clientX - rect.left;
+    const startY = event.clientY - rect.top;
+
+    const rectEl = document.createElement("div");
+    rectEl.className = "annotation-area dragging";
+    rectEl.style.left = startX + "px";
+    rectEl.style.top = startY + "px";
+    rectEl.style.width = "0px";
+    rectEl.style.height = "0px";
+    container.appendChild(rectEl);
+
+    areaDrag = {
+      variation,
+      container,
+      startX,
+      startY,
+      currentX: startX,
+      currentY: startY,
+      rectEl,
+      onMove: null,
+      onUp: null,
+    };
+
+    // Use window-level listeners so the drag continues even when the
+    // pointer leaves the overlay (matches selection-box UX in IDEs).
+    areaDrag.onMove = (e) => updateAreaDrag(e);
+    areaDrag.onUp = (e) => endAreaDrag(e);
+    window.addEventListener("mousemove", areaDrag.onMove);
+    window.addEventListener("mouseup", areaDrag.onUp, { once: true });
+  }
+
+  function updateAreaDrag(event) {
+    if (!areaDrag) return;
+    const rect = areaDrag.container.getBoundingClientRect();
+    const x = clamp(event.clientX - rect.left, 0, rect.width);
+    const y = clamp(event.clientY - rect.top, 0, rect.height);
+    areaDrag.currentX = x;
+    areaDrag.currentY = y;
+
+    const left = Math.min(areaDrag.startX, x);
+    const top = Math.min(areaDrag.startY, y);
+    const width = Math.abs(x - areaDrag.startX);
+    const height = Math.abs(y - areaDrag.startY);
+
+    areaDrag.rectEl.style.left = left + "px";
+    areaDrag.rectEl.style.top = top + "px";
+    areaDrag.rectEl.style.width = width + "px";
+    areaDrag.rectEl.style.height = height + "px";
+  }
+
+  function endAreaDrag(event) {
+    if (!areaDrag) return;
+    const drag = areaDrag;
+    areaDrag = null;
+    window.removeEventListener("mousemove", drag.onMove);
+
+    const rect = drag.container.getBoundingClientRect();
+    const width = Math.abs(drag.currentX - drag.startX);
+    const height = Math.abs(drag.currentY - drag.startY);
+
+    // Reject noise drags — a slip of the mouse shouldn't open a popup.
+    const MIN = 12;
+    if (width < MIN || height < MIN) {
+      drag.rectEl.remove();
+      return;
+    }
+
+    const left = Math.min(drag.startX, drag.currentX);
+    const top = Math.min(drag.startY, drag.currentY);
+
+    // Store bounds as fractions of the container. The iframe fills the
+    // container at 100% width with height = content scrollHeight, so
+    // container fractions equal content fractions in our layout. On
+    // re-render (different view, different container size) we multiply
+    // back by the current container rect.
+    const bounds = {
+      x: left / rect.width,
+      y: top / rect.height,
+      w: width / rect.width,
+      h: height / rect.height,
+    };
+
+    // Freeze the visible rect and attach the text input next to it. The
+    // rect is part of the container; the popup uses viewport coords.
+    drag.rectEl.classList.remove("dragging");
+    showAreaInput(
+      event.clientX,
+      event.clientY,
+      drag.variation,
+      bounds,
+      drag.rectEl
+    );
+  }
+
+  function clamp(v, lo, hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+  }
+
+  function showAreaInput(clientX, clientY, variation, bounds, tempRectEl) {
+    const existing = document.querySelector(".annotation-input");
+    if (existing) existing.remove();
+
+    const popup = document.createElement("div");
+    popup.className = "annotation-input";
+    popup.style.position = "fixed";
+    popup.style.left = (clientX + 10) + "px";
+    popup.style.top = (clientY - 20) + "px";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Describe this region...";
+    popup.appendChild(input);
+
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "Add";
+    popup.appendChild(addBtn);
+
+    document.body.appendChild(popup);
+    input.focus();
+
+    function cancel() {
+      popup.remove();
+      tempRectEl.remove();
+    }
+
+    function submit() {
+      const text = input.value.trim();
+      if (!text) {
+        cancel();
+        return;
+      }
+      state.pinCounter += 1;
+      const annotation = {
+        pin: state.pinCounter,
+        variation,
+        round: state.round,
+        position: { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 },
+        selector: "",
+        offset: null,
+        shape: "area",
+        bounds,
+        text,
+      };
+      state.annotations.push(annotation);
+
+      postEvent({
+        type: "annotate",
+        variation,
+        round: annotation.round,
+        pin: annotation.pin,
+        position: annotation.position,
+        selector: annotation.selector,
+        text: annotation.text,
+        shape: "area",
+        bounds,
+      });
+
+      popup.remove();
+      tempRectEl.remove();
+      renderCurrentView();
+      updateStats();
+    }
+
+    function onKey(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    }
+
+    input.addEventListener("keydown", onKey);
+    addBtn.addEventListener("click", submit);
+  }
 
   function handleOverlayClick(event, variation, container) {
     const rect = container.getBoundingClientRect();
-    const relX = (event.clientX - rect.left) / rect.width;
-    const relY = (event.clientY - rect.top) / rect.height;
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const relX = localX / rect.width;
+    const relY = localY / rect.height;
 
     if (state.mode === "annotate") {
-      showAnnotationInput(
-        event.clientX,
-        event.clientY,
-        relX,
-        relY,
+      // Show the input popup first (clears any stale pending click).
+      showAnnotationInput(event.clientX, event.clientY, variation);
+
+      // Then open a pending-click record the iframe can patch. The
+      // clickId guards against a late reply from a previous click
+      // landing on the current record after the user moved on.
+      const clickId = ++annotateClickSeq;
+      pendingAnnotateClick = {
+        clickId,
         variation,
-        container
-      );
+        container,
+        fallback: { x: relX, y: relY },
+        selector: null,
+        offset: null,
+      };
+      const iframe = container.querySelector("iframe");
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage(
+          { type: "forge-annotate-click", clickId, x: localX, y: localY },
+          "*"
+        );
+      }
     } else if (state.mode === "select") {
       const iframe = container.querySelector("iframe");
       if (iframe && iframe.contentWindow) {
-        const localX = event.clientX - rect.left;
-        const localY = event.clientY - rect.top;
         iframe.contentWindow.postMessage(
           { type: "forge-click", x: localX, y: localY },
           "*"
@@ -438,10 +835,14 @@
     }
   }
 
-  function showAnnotationInput(clientX, clientY, relX, relY, variation, container) {
+  function showAnnotationInput(clientX, clientY, variation) {
     // Remove any existing popup
     const existing = document.querySelector(".annotation-input");
-    if (existing) existing.remove();
+    if (existing) {
+      existing.remove();
+      // Also clear any stale pending click — the new click supersedes it.
+      pendingAnnotateClick = null;
+    }
 
     const popup = document.createElement("div");
     popup.className = "annotation-input";
@@ -465,24 +866,40 @@
       const text = input.value.trim();
       if (!text) {
         popup.remove();
+        pendingAnnotateClick = null;
         return;
       }
       state.pinCounter += 1;
+
+      // Pull iframe-resolved data if the iframe responded in time;
+      // otherwise fall back to container-fraction coordinates only. The
+      // annotation will still render via the fallback path, just without
+      // element-reanchoring on reflow.
+      const pending = pendingAnnotateClick;
+      const selector = pending?.selector ?? "";
+      const offset = pending?.offset ?? null;
+      const fallback = pending?.fallback ?? { x: 0.5, y: 0.5 };
+
       const annotation = {
         pin: state.pinCounter,
         variation,
-        position: { x: relX, y: relY },
-        selector: "",
+        round: state.round,
+        position: fallback,
+        selector,
+        offset,
         text,
       };
       state.annotations.push(annotation);
+      pendingAnnotateClick = null;
 
       postEvent({
         type: "annotate",
         variation,
+        round: annotation.round,
         pin: annotation.pin,
         position: annotation.position,
         selector: annotation.selector,
+        offset: annotation.offset ?? undefined,
         text: annotation.text,
       });
 
@@ -518,6 +935,7 @@
       postEvent({
         type: "verdict",
         variation,
+        round: state.round,
         action,
       });
     }
@@ -531,6 +949,22 @@
   window.addEventListener("message", (event) => {
     if (!event.data || event.data.source !== "forge-iframe") return;
     const { type, selector, label } = event.data;
+
+    // Annotate mode: iframe reports the element that was under the click
+    // plus the click's offset within that element. Only patch when the
+    // clickId matches — a late reply from a superseded click would
+    // otherwise overwrite the current record with stale data.
+    if (type === "annotate-resolved") {
+      if (
+        pendingAnnotateClick &&
+        pendingAnnotateClick.clickId === event.data.clickId
+      ) {
+        pendingAnnotateClick.selector = selector || null;
+        pendingAnnotateClick.offset = event.data.offset || null;
+      }
+      return;
+    }
+
     if (type !== "element-selected") return;
     if (state.mode !== "select") return;
 
@@ -541,7 +975,10 @@
     for (const ifr of iframes) {
       if (ifr.contentWindow === event.source) {
         const src = ifr.getAttribute("src") || "";
-        const filename = src.replace(/^\/content\//, "");
+        // Strip the topic segment (if present) before parsing. We accept
+        // both /content/<topic>/<file> and the legacy /content/<file>.
+        const filename = src.replace(/^\/content\/[^/]+\//, "")
+          .replace(/^\/content\//, "");
         const parsed = parseFilename(filename);
         if (parsed) variation = parsed.variation;
         break;
@@ -552,6 +989,7 @@
     postEvent({
       type: "select",
       variation,
+      round: state.round,
       selector,
       label,
       action: "like",
@@ -715,7 +1153,16 @@
         try {
           const msg = JSON.parse(event.data);
           if (msg && msg.type === "reload") {
-            loadState();
+            // Reload events are scoped to a topic (files changed inside
+            // content/<topicId>/). Refresh topics either way so a new
+            // one shows up in the tab bar; only reload the main view
+            // when the change is in the topic we're currently showing.
+            fetchTopics().then(() => {
+              renderTopicTabs();
+              if (!msg.topicId || msg.topicId === state.activeTopic) {
+                loadState();
+              }
+            });
           } else if (msg && msg.type === "toast" && typeof msg.message === "string") {
             showToast(msg.message);
           }
@@ -782,9 +1229,61 @@
   function init() {
     wireToolbar();
     wireFeedbackBar();
+    wireGeneralNote();
     loadState();
     connectWebSocket();
     startHealthPolling();
+  }
+
+  function wireGeneralNote() {
+    const textarea = document.getElementById("general-note");
+    const submitBtn = document.getElementById("general-note-submit");
+    if (!textarea || !submitBtn) return;
+
+    function submit() {
+      const text = textarea.value.trim();
+      if (!text) return;
+      state.pinCounter += 1;
+      const annotation = {
+        pin: state.pinCounter,
+        // General notes aren't tied to a variation; empty string keeps
+        // annotationsFor(letter) from matching them as pins.
+        variation: "",
+        round: state.round,
+        position: { x: 0, y: 0 },
+        selector: "",
+        offset: null,
+        shape: "general",
+        bounds: null,
+        text,
+      };
+      state.annotations.push(annotation);
+
+      postEvent({
+        type: "annotate",
+        variation: "",
+        round: annotation.round,
+        pin: annotation.pin,
+        position: annotation.position,
+        selector: "",
+        text: annotation.text,
+        shape: "general",
+      });
+
+      textarea.value = "";
+      renderNotesSidebar();
+      updateStats();
+    }
+
+    submitBtn.addEventListener("click", submit);
+    textarea.addEventListener("keydown", (e) => {
+      // Cmd/Ctrl+Enter submits. Plain Enter inserts a newline (textarea
+      // default) so multi-line notes are easy.
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        submit();
+      }
+    });
   }
 
   if (document.readyState === "loading") {

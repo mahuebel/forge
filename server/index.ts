@@ -11,9 +11,11 @@ import {
   unregisterActiveSession,
 } from "./session";
 import { createRouteHandler } from "./routes";
+import { ensureRegistry } from "./topics";
 import { createContentWatcher } from "./watcher";
 import { createBridge } from "./bridge";
 import { createHeartbeatEmitter } from "./health";
+import { createWatchdog } from "./watchdog";
 import { createSequenceCounter, countEvents } from "./events";
 
 const { values } = parseArgs({
@@ -52,9 +54,15 @@ const pluginVersion = readPluginVersion();
 
 // ── Session setup ──
 const paths = await createSession(baseDir, sessionId);
+const topicRegistry = await ensureRegistry(paths.root);
 console.log("[forge] Session: " + sessionId);
 console.log("[forge] Content dir: " + paths.content);
 console.log("[forge] Events file: " + paths.eventsFile);
+console.log(
+  "[forge] Topics: " +
+    topicRegistry.topics.map((t) => t.id).join(", ") +
+    " (active=" + topicRegistry.activeId + ")"
+);
 
 // ── Sequence counter (start after existing events) ──
 const existingCount = await countEvents(paths.eventsFile);
@@ -106,6 +114,7 @@ const serverInfo = {
   eventsFile: paths.eventsFile,
   version: pluginVersion,
   claudePid,
+  serverPid: process.pid,
 };
 await writeServerInfo(paths.serverInfoFile, serverInfo);
 
@@ -118,11 +127,21 @@ console.log("[forge] Server running at http://localhost:" + server.port);
 console.log("[forge] Registered active session for channel discovery");
 
 // ── File watcher → notify browsers ──
-const watcher = createContentWatcher(paths.content, (files) => {
-  console.log("[forge] New/changed files: " + files.join(", "));
-  const message = JSON.stringify({ type: "reload", files });
-  for (const ws of wsClients) {
-    ws.send(message);
+// Watches content/ recursively so any topic's round-*.html changes
+// trigger a reload scoped to that topic. The client filters by active
+// topic and ignores reload events for other topics it isn't viewing.
+const watcher = createContentWatcher(paths.content, (changes) => {
+  const summary = changes.map((c) => c.topicId + "/" + c.filename).join(", ");
+  console.log("[forge] New/changed files: " + summary);
+  const byTopic = new Map<string, string[]>();
+  for (const c of changes) {
+    const list = byTopic.get(c.topicId) ?? [];
+    list.push(c.filename);
+    byTopic.set(c.topicId, list);
+  }
+  for (const [topicId, files] of byTopic) {
+    const message = JSON.stringify({ type: "reload", topicId, files });
+    for (const ws of wsClients) ws.send(message);
   }
 });
 watcher.start();
@@ -152,9 +171,31 @@ const heartbeat = createHeartbeatEmitter({
 });
 heartbeat.start();
 
+// ── Orphan watchdog ──
+// If the owning Claude Code process exits (clean shutdown, crash, SIGKILL,
+// terminal closed), this server has no reason to keep running. Poll the
+// owning pid every 10s and shut down when it's gone. Skipped when no
+// claudePid was provided (legacy launches or manual debugging).
+let watchdog: ReturnType<typeof createWatchdog> | null = null;
+if (claudePid !== undefined) {
+  watchdog = createWatchdog({
+    claudePid,
+    intervalMs: 10_000,
+    onOrphaned: () => {
+      console.log("[forge] Owning Claude pid " + claudePid + " is gone — shutting down");
+      void shutdown();
+    },
+  });
+  watchdog.start();
+}
+
 // ── Graceful shutdown ──
+let shuttingDown = false;
 async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log("[forge] Shutting down...");
+  watchdog?.stop();
   heartbeat.stop();
   bridge.stop();
   watcher.stop();
