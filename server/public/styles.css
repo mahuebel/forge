@@ -352,6 +352,16 @@ body[data-view="full"] .grid {
   opacity: 0.5;
 }
 
+.panel.accepted {
+  border-color: #eab308;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.25);
+}
+
+.panel.dimmed {
+  opacity: 0.35;
+  filter: grayscale(0.4);
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -402,6 +412,30 @@ body[data-view="full"] .grid {
   background: var(--danger-bg);
   border-color: #7f1d1d;
   color: var(--danger);
+}
+
+.panel-action.accept-btn {
+  width: auto;
+  padding: 0 8px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.panel-action.accept-btn.accepted {
+  background: rgba(234, 179, 8, 0.2);
+  border-color: #a16207;
+  color: #facc15;
+}
+
+.chip.accepted {
+  border-color: #eab308;
+  color: #facc15;
+}
+
+.chip.dimmed {
+  opacity: 0.5;
 }
 
 .panel-content {

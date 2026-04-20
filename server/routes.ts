@@ -44,7 +44,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 // ─── Valid event types ────────────────────────────────────────────────────────
 
-const VALID_TYPES = new Set(["select", "annotate", "verdict", "refine"]);
+const VALID_TYPES = new Set(["select", "annotate", "verdict", "refine", "accept"]);
 
 // ─── Topic helpers ────────────────────────────────────────────────────────────
 

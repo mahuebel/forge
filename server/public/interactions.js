@@ -19,6 +19,11 @@
     // (variations, annotations, round, prompt) reflects the active one.
     topics: [],              // [{id, title, createdAt}]
     activeTopic: "default",
+    // Terminal pick for the current topic+round — null until the user
+    // clicks Accept on a variation. Cleared on each new round event.
+    // Latest accept wins (last-write) during replay, matching the
+    // "overwrite until consumer acks" semantics.
+    accepted: null,          // variation letter or null
   };
 
   // Ephemeral state for the annotate flow: between the overlay click and
@@ -170,6 +175,7 @@
           state.prompt = ev.prompt || "";
           state.annotations = [];
           state.pinCounter = 0;
+          state.accepted = null;
           for (const v of state.variations) v.status = "default";
           continue;
         }
@@ -181,6 +187,10 @@
           const v = findVariation(ev.variation);
           if (v) {
             v.status = ev.action === "like" ? "liked" : "rejected";
+          }
+        } else if (ev.type === "accept") {
+          if (findVariation(ev.variation)) {
+            state.accepted = ev.variation;
           }
         } else if (ev.type === "annotate") {
           state.annotations.push({
@@ -309,6 +319,10 @@
     panel.className = "panel";
     if (v.status === "liked") panel.classList.add("liked");
     if (v.status === "rejected") panel.classList.add("rejected");
+    if (state.accepted) {
+      if (state.accepted === v.variation) panel.classList.add("accepted");
+      else panel.classList.add("dimmed");
+    }
 
     // Header
     const header = document.createElement("div");
@@ -341,6 +355,20 @@
       handleVerdict(v.variation, "reject");
     });
     actions.appendChild(rejectBtn);
+
+    const acceptBtn = document.createElement("button");
+    acceptBtn.className = "panel-action accept-btn";
+    if (state.accepted === v.variation) acceptBtn.classList.add("accepted");
+    acceptBtn.title =
+      state.accepted === v.variation
+        ? "Accepted — click to change your mind"
+        : "Accept this as the final pick";
+    acceptBtn.textContent = state.accepted === v.variation ? "\uD83D\uDD12" : "Accept"; // 🔒 or "Accept"
+    acceptBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleAccept(v.variation);
+    });
+    actions.appendChild(acceptBtn);
 
     header.appendChild(actions);
     panel.appendChild(header);
@@ -413,6 +441,10 @@
       if (v.variation === state.activeVariation) chip.classList.add("active");
       if (v.status === "liked") chip.classList.add("liked");
       if (v.status === "rejected") chip.classList.add("rejected");
+      if (state.accepted) {
+        if (state.accepted === v.variation) chip.classList.add("accepted");
+        else chip.classList.add("dimmed");
+      }
       chip.textContent = v.variation.toUpperCase() + " — Variation";
 
       const count = annotationsFor(v.variation).length;
@@ -920,6 +952,29 @@
 
     input.addEventListener("keydown", onKey);
     addBtn.addEventListener("click", submit);
+  }
+
+  function handleAccept(variation) {
+    const v = findVariation(variation);
+    if (!v) return;
+
+    // Idempotent: re-clicking the already-accepted variation is a no-op.
+    // Clicking Accept on a different variation overwrites the prior
+    // pick (last-write-wins) — matches the documented event semantics
+    // ("change your mind before the consumer processed it"). There is
+    // intentionally no unaccept event; the only way out is to pick a
+    // different variation or to start a new round.
+    if (state.accepted === variation) return;
+
+    state.accepted = variation;
+    postEvent({
+      type: "accept",
+      variation,
+      round: state.round,
+    });
+
+    renderCurrentView();
+    updateStats();
   }
 
   function handleVerdict(variation, action) {

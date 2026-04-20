@@ -108,6 +108,20 @@ describe("HTTP routes", () => {
     expect(body.seq).toBe(2);
   });
 
+  test("POST /api/events accepts type=accept and round-trips variation/round", async () => {
+    const res = await fetch(`http://localhost:${server.port}/api/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "accept", variation: "a", round: 2 }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.type).toBe("accept");
+    expect(body.variation).toBe("a");
+    expect(body.round).toBe(2);
+    expect(typeof body.timestamp).toBe("number");
+  });
+
   test("POST /api/events with invalid type returns 400", async () => {
     const res = await fetch(`http://localhost:${server.port}/api/events`, {
       method: "POST",

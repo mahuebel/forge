@@ -6,6 +6,7 @@ import type {
   SelectEvent,
   AnnotateEvent,
   VerdictEvent,
+  AcceptEvent,
 } from "./events";
 import {
   appendEvent,
@@ -92,6 +93,23 @@ describe("VerdictEvent", () => {
       timestamp: Date.now(),
     };
     expect(withoutReason.reason).toBeUndefined();
+  });
+});
+
+describe("AcceptEvent", () => {
+  test("has variation and optional round, distinct from verdict/select", () => {
+    const accept: AcceptEvent = {
+      type: "accept",
+      seq: 10,
+      variation: "a",
+      round: 2,
+      timestamp: Date.now(),
+      topic_id: "dashboard",
+    };
+    expect(accept.type).toBe("accept");
+    expect(accept.variation).toBe("a");
+    expect(accept.round).toBe(2);
+    expect(accept.topic_id).toBe("dashboard");
   });
 });
 

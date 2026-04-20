@@ -82,13 +82,29 @@ export interface RefineEvent extends BaseEvent {
   note?: string;
 }
 
+/**
+ * Terminal acceptance signal for a variation within a topic+round. Emitted
+ * by the workspace's Accept affordance. Distinct from `verdict` (lightweight
+ * like/reject feedback) and `select` (component-level picking inside the
+ * iframe). Downstream consumers treat the latest `accept` for a given
+ * (topic_id, round) as the user's final choice — subsequent accepts on the
+ * same topic/round overwrite earlier ones until a consumer acknowledges.
+ */
+export interface AcceptEvent extends BaseEvent {
+  type: "accept";
+  variation: string;
+  /** See SelectEvent.round. */
+  round?: number;
+}
+
 export type ForgeEvent =
   | SelectEvent
   | AnnotateEvent
   | VerdictEvent
   | RoundEvent
   | HeartbeatEvent
-  | RefineEvent;
+  | RefineEvent
+  | AcceptEvent;
 
 // ─── JSONL utilities ───────────────────────────────────────────────────────
 

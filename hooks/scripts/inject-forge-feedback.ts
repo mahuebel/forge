@@ -151,6 +151,7 @@ function formatEventsAsContext(events: FormattableEvent[], url: string): string 
   lines.push("");
 
   const wantsRefine = events.some((e) => e.type === "refine");
+  const acceptedEvents = events.filter((e) => e.type === "accept");
 
   for (const e of events) {
     const topic = typeof e.topic_id === "string" ? `[${e.topic_id}] ` : "";
@@ -185,11 +186,20 @@ function formatEventsAsContext(events: FormattableEvent[], url: string): string 
         lines.push(`- ${topic}Developer clicked **Refine** — they want a new round based on accumulated feedback.`);
         break;
       }
+      case "accept": {
+        const v = (e.variation ?? "?").toUpperCase();
+        lines.push(`- ${topic}Developer **ACCEPTED** Variation ${v} — terminal pick for this topic/round.`);
+        break;
+      }
     }
   }
 
   lines.push("");
-  if (wantsRefine) {
+  if (acceptedEvents.length > 0) {
+    lines.push(
+      "**Action requested:** the developer has accepted a variation. Move to resolution — write the accepted variation into actual project files matching the stack's conventions. Do not regenerate unless explicitly asked."
+    );
+  } else if (wantsRefine) {
     lines.push(
       "**Action requested:** the developer wants you to generate the next round. Reference the accumulated feedback explicitly, then write new variation files (`round-N-*.html`) incorporating it."
     );

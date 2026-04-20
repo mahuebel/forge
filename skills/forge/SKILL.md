@@ -243,6 +243,7 @@ The channel and the hook use separate cursors (`channel-cursor` vs `injected-cur
 | **Annotation** (with text) | Acknowledge immediately. Quote the note. Confirm it's queued for the next round. |
 | **Component selection** | Accumulate silently. Do NOT reply for each click. Wait for explicit refine request. |
 | **Refine** | Generate the next round of variations incorporating all accumulated feedback. |
+| **Accept** | Terminal pick for this topic/round. Move to Phase 4 resolution — write the accepted variation into actual project files matching the stack's conventions. Do NOT regenerate unless the developer explicitly asks. If a later `accept` arrives on the same topic, treat it as "changed their mind" and use the latest variation. |
 | **Heartbeat** | Ignore completely. No response. |
 | **Replayed event** (`"replayed": true`) | Process normally. Do not re-acknowledge events you already confirmed. |
 
@@ -279,7 +280,12 @@ Each new round should show clear evolution — address the specific notes, keep 
 
 ## Phase 4: Resolution
 
-When the developer says "go with A", "finalize B", or "merge the sidebar from A with the content area from B":
+The developer can signal resolution two ways:
+
+- **Click the Accept button** on a variation card in the workspace — emits an `accept` event. This is the unambiguous "this one, ship it" signal. Treat it as terminal: proceed directly to writing the variation into project files.
+- **Type a phrase in chat** like "go with A", "finalize B", or "merge the sidebar from A with the content area from B" — useful for composites or natural-language direction.
+
+When either happens:
 
 1. **Identify the final design** — one variation, or a described composite.
 

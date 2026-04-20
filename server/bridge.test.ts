@@ -128,6 +128,21 @@ describe("formatEvent", () => {
     expect(result).toContain("(30%, 20%)");
     expect(result).toContain("Cluttered region");
   });
+
+  test("formats accept event as terminal pick signal", () => {
+    const event = {
+      type: "accept",
+      seq: 10,
+      timestamp: Date.now(),
+      variation: "b",
+      round: 2,
+      topic_id: "dashboard",
+    } as const;
+    const result = formatEvent(event);
+    expect(result).toContain("Variation B ACCEPTED");
+    expect(result).toContain("terminal");
+    expect(result).toContain("[topic: dashboard]");
+  });
 });
 
 // ─── Cursor management ────────────────────────────────────────────────────────

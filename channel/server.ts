@@ -103,13 +103,14 @@ const mcp = new Server(
     },
     instructions: [
       "Events from the forge visual workspace arrive as <channel source=\"forge\" ...> tags.",
-      "Each event has a `type` attribute: verdict, annotate, select, round, refine.",
+      "Each event has a `type` attribute: verdict, annotate, select, round, refine, accept.",
       "",
       "Response rules:",
       "- type=\"verdict\": acknowledge immediately, note what worked or didn't",
       "- type=\"annotate\": acknowledge the note, confirm it's queued for the next round",
       "- type=\"select\": accumulate silently, don't reply per click",
       "- type=\"refine\": generate the next round of variations incorporating all accumulated feedback. Write files named round-N-{a,b,c}.html to <contentDir>/<topic_id>/, then append a round event (with the same topic_id) to eventsFile.",
+      "- type=\"accept\": terminal pick for this topic+round. Move to resolution — write the chosen variation into actual project files (matching the project's stack/conventions). Do not regenerate unless the developer explicitly asks. A later \"accept\" on the same topic supersedes the earlier one.",
       "- type=\"round\": informational, don't reply",
       "",
       "The `session_id` attribute identifies which forge session the event came from. The `topic_id` attribute (when present) identifies which `/forge` invocation within that session — a single session can host many topics side-by-side. Always scope file writes and round events to the event's topic_id.",
@@ -290,6 +291,10 @@ function formatEventBody(event: Record<string, unknown>): string {
     }
     case "refine": {
       return `${topicPrefix}Developer clicked Refine. Generate the next round of variations incorporating all accumulated feedback — reference specific likes, annotations, and rejections, then write the new round's HTML files and append a round event to the events file.`;
+    }
+    case "accept": {
+      const v = String(event.variation ?? "?").toUpperCase();
+      return `${topicPrefix}Developer ACCEPTED Variation ${v}. This is the terminal pick for this topic+round — proceed to resolution: write it into the actual project files matching the stack's conventions. Do not regenerate unless the developer explicitly asks.`;
     }
     default:
       return JSON.stringify(event);

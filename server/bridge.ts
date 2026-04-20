@@ -40,6 +40,8 @@ export function formatEvent(event: ForgeEvent): string {
       const noteText = event.note ? ` — "${event.note}"` : "";
       return `[forge] ${topic}Developer requested refinement${noteText}`;
     }
+    case "accept":
+      return `[forge] ${topic}Variation ${event.variation.toUpperCase()} ACCEPTED — this is the developer's final pick for this topic/round. Treat as terminal: proceed to resolution (write it into project files) unless they explicitly ask for another round.`;
     default:
       return `[forge] Unknown event: ${JSON.stringify(event)}`;
   }
