@@ -89,10 +89,12 @@
       if (!res.ok) return;
       const data = await res.json();
       state.topics = data.topics || [];
-      // Preserve the client's current selection if it still exists AND
-      // the user has made an explicit pick (hasExplicitTopic). Without an
-      // explicit pick, auto-select the newest non-default topic so the
-      // workspace opens on a real tab instead of the vestigial default.
+      // Preserve the client's selection when it still exists. The two
+      // guards cover: (1) the user explicitly picked this topic — never
+      // swap it out; (2) we already auto-promoted a real topic and it's
+      // still here — don't re-promote as new topics arrive, or the view
+      // would thrash during bootstrap. Only when neither guard holds do
+      // we (re)pick the newest real topic.
       const stillPresent = state.topics.some((t) => t.id === state.activeTopic);
       if (stillPresent && state.hasExplicitTopic) return;
       if (stillPresent && state.activeTopic !== "default") return;
