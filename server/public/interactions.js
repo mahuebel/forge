@@ -183,6 +183,7 @@
       body: JSON.stringify({ id: topicId }),
     }).catch(() => { /* ignore */ });
     renderTopicTabs();
+    updateHash();
     await loadState();
   }
 
@@ -286,10 +287,13 @@
         }
       }
 
-      // Set active variation
+      // Set active variation. If an activeVariation was carried in from
+      // the URL hash and still resolves, keep it; otherwise default to
+      // the first variation in the current round.
       if (state.variations.length > 0 && !findVariation(state.activeVariation)) {
         state.activeVariation = state.variations[0].variation;
       }
+      updateHash();
 
       // Update prompt display and round badge
       const promptEl = document.getElementById("prompt-display");
@@ -616,6 +620,7 @@
 
       chip.addEventListener("click", () => {
         state.activeVariation = v.variation;
+        updateHash();
         renderFullView();
       });
 
@@ -1236,6 +1241,7 @@
         document.body.dataset.view = view;
         viewBtns.forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
+        updateHash();
         renderCurrentView();
       });
     });
@@ -1445,9 +1451,60 @@
     wireToolbar();
     wireFeedbackBar();
     wireGeneralNote();
+    window.addEventListener("hashchange", handleHashChange);
     loadState();
     connectWebSocket();
     startHealthPolling();
+  }
+
+  async function handleHashChange() {
+    if (suppressNextHashChange) {
+      suppressNextHashChange = false;
+      return;
+    }
+    const { topicId, variation } = parseHash(location.hash);
+
+    // Apply topic change first so loadState picks up the right variations.
+    if (topicId && topicId !== state.activeTopic) {
+      state.activeTopic = topicId;
+      state.hasExplicitTopic = true;
+      renderTopicTabs();
+      await loadState();
+    }
+
+    // After loadState, the variation letter may or may not exist.
+    if (variation) {
+      if (findVariation(variation)) {
+        state.activeVariation = variation;
+        if (state.view !== "full") {
+          state.view = "full";
+          document.body.dataset.view = "full";
+          document.querySelectorAll(".view-toggle-btn[data-view]").forEach((b) => {
+            b.classList.toggle("active", b.getAttribute("data-view") === "full");
+          });
+        }
+      } else {
+        // Unknown variation letter for this topic → fall back to grid.
+        if (state.view !== "grid") {
+          state.view = "grid";
+          document.body.dataset.view = "grid";
+          document.querySelectorAll(".view-toggle-btn[data-view]").forEach((b) => {
+            b.classList.toggle("active", b.getAttribute("data-view") === "grid");
+          });
+        }
+      }
+    } else {
+      // No variation in the new hash → grid view.
+      if (state.view !== "grid") {
+        state.view = "grid";
+        document.body.dataset.view = "grid";
+        document.querySelectorAll(".view-toggle-btn[data-view]").forEach((b) => {
+          b.classList.toggle("active", b.getAttribute("data-view") === "grid");
+        });
+      }
+    }
+
+    renderCurrentView();
   }
 
   function wireGeneralNote() {
