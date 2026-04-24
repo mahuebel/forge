@@ -1551,6 +1551,7 @@
     wireToolbar();
     wireFeedbackBar();
     wireGeneralNote();
+    wireShareButton();
 
     // Honor URL hash on boot. Setting activeTopic here (before loadState)
     // means the first fetch targets the hashed topic, not the default.
@@ -1672,6 +1673,56 @@
         submit();
       }
     });
+  }
+
+  function wireShareButton() {
+    const btn = document.getElementById("btn-share");
+    if (!btn) return;
+    const label = btn.querySelector(".topbar-share-label");
+    const originalText = label ? label.textContent : "Share";
+
+    btn.addEventListener("click", async () => {
+      const url = location.href;
+      let ok = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(url);
+          ok = true;
+        } else {
+          ok = fallbackCopy(url);
+        }
+      } catch {
+        ok = fallbackCopy(url);
+      }
+
+      if (ok) {
+        btn.classList.add("copied");
+        if (label) label.textContent = "Copied!";
+        setTimeout(() => {
+          btn.classList.remove("copied");
+          if (label) label.textContent = originalText;
+        }, 1500);
+      } else {
+        showToast("Copy failed — select the URL from the address bar instead.");
+      }
+    });
+  }
+
+  function fallbackCopy(text) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "absolute";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
   }
 
   if (document.readyState === "loading") {

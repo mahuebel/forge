@@ -979,3 +979,36 @@ body[data-view="full"] .feedback-bar {
 .workspace-banner-dismiss:hover {
   background: rgba(251, 191, 36, 0.1);
 }
+
+/* ============================================================
+   Share button — copy link to clipboard
+   ============================================================ */
+
+.topbar-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-left: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.topbar-share:hover {
+  background: var(--bg-elevated);
+}
+
+.topbar-share.copied {
+  background: var(--success-bg);
+  border-color: #166534;
+  color: var(--success);
+}
+
+.topbar-share-icon {
+  font-size: 12px;
+}
