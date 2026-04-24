@@ -26,9 +26,9 @@
     // longer drag the view away.
     hasExplicitTopic: false,
     // Hash-pointed topic that has not yet appeared in the registry.
-    // While set, checkPendingHashTopic will retry on each WS reload and
-    // on each health-poll tick. After PENDING_HASH_MAX_CHECKS with no
-    // resolution, the banner appears and we fall back to the newest.
+    // While set, reconcilePendingHashTopic checks on every fetchTopics and
+    // tickPendingHashTopic increments the timeout on each health-poll tick.
+    // After PENDING_HASH_MAX_CHECKS with no resolution, we fall back to newest.
     pendingHashTopic: null,
     pendingHashChecks: 0,
     // Terminal pick for the current topic+round — null until the user
@@ -149,7 +149,7 @@
       if (!res.ok) return;
       const data = await res.json();
       state.topics = data.topics || [];
-      checkPendingHashTopic();
+      reconcilePendingHashTopic();
       // While a hash-pointed topic is still pending, don't overwrite the
       // active selection — we're holding it for the topic to appear.
       if (state.pendingHashTopic) return;
@@ -610,12 +610,27 @@
     if (el) el.style.display = "none";
   }
 
-  // Called after each fetchTopics to see whether the hash-pointed topic
-  // has arrived. Increments a counter; after PENDING_HASH_MAX_CHECKS
-  // unsuccessful attempts, falls back to the newest real topic and
-  // raises a dismissable banner.
-  function checkPendingHashTopic() {
+  // Cheap check for "did the topic appear?". Safe to call from any
+  // fetchTopics (including the WS-reload path that may fire multiple
+  // fetches in quick succession). Does NOT tick the timeout counter —
+  // that job belongs to tickPendingHashTopic, which the health poll
+  // calls on its own 5-second cadence.
+  function reconcilePendingHashTopic() {
     if (!state.pendingHashTopic) return;
+    const found = state.topics.some((t) => t.id === state.pendingHashTopic);
+    if (found) {
+      state.pendingHashTopic = null;
+      state.pendingHashChecks = 0;
+      hideBanner();
+    }
+  }
+
+  // Periodic tick (~5s). Increments the check counter; after
+  // PENDING_HASH_MAX_CHECKS unresolved attempts, falls back to the
+  // newest real topic and raises a dismissable banner.
+  function tickPendingHashTopic() {
+    if (!state.pendingHashTopic) return;
+    // Topic may have appeared between ticks — reconcile first.
     const found = state.topics.some((t) => t.id === state.pendingHashTopic);
     if (found) {
       state.pendingHashTopic = null;
@@ -1522,6 +1537,7 @@
       }
       if (state.pendingHashTopic) {
         await fetchTopics();
+        tickPendingHashTopic();
         renderTopicTabs();
       }
     }
@@ -1539,7 +1555,7 @@
     // Honor URL hash on boot. Setting activeTopic here (before loadState)
     // means the first fetch targets the hashed topic, not the default.
     // pendingHashTopic stays set until fetchTopics confirms the topic
-    // exists; see checkPendingHashTopic.
+    // exists; see reconcilePendingHashTopic / tickPendingHashTopic.
     const parsed = parseHash(location.hash);
     if (parsed.topicId) {
       state.activeTopic = parsed.topicId;
@@ -1568,11 +1584,16 @@
     if (topicId && topicId !== state.activeTopic) {
       state.activeTopic = topicId;
       state.hasExplicitTopic = true;
-      // If this topic isn't in the known registry yet, mark it pending
-      // so fetchTopics' early-return and checkPendingHashTopic's banner
-      // kick in (same flow as boot-from-hash).
+      // Navigating to a different topic always clears any prior pending
+      // pointer — otherwise a stale "Loading topic-a..." banner from a
+      // previous paste could fall through to a "not found" fallback for
+      // the wrong topic once MAX ticks elapse.
       const known = state.topics.some((t) => t.id === topicId);
-      if (!known) {
+      if (known) {
+        state.pendingHashTopic = null;
+        state.pendingHashChecks = 0;
+        hideBanner();
+      } else {
         state.pendingHashTopic = topicId;
         state.pendingHashChecks = 0;
       }
