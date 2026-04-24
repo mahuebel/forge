@@ -610,19 +610,24 @@
     if (el) el.style.display = "none";
   }
 
+  // Returns true when the pending hash-topic has just resolved (found
+  // in the registry for the first time). The caller is responsible for
+  // triggering any reload that should follow.
   // Cheap check for "did the topic appear?". Safe to call from any
   // fetchTopics (including the WS-reload path that may fire multiple
   // fetches in quick succession). Does NOT tick the timeout counter —
   // that job belongs to tickPendingHashTopic, which the health poll
   // calls on its own 5-second cadence.
   function reconcilePendingHashTopic() {
-    if (!state.pendingHashTopic) return;
+    if (!state.pendingHashTopic) return false;
     const found = state.topics.some((t) => t.id === state.pendingHashTopic);
     if (found) {
       state.pendingHashTopic = null;
       state.pendingHashChecks = 0;
       hideBanner();
+      return true;
     }
+    return false;
   }
 
   // Periodic tick (~5s). Increments the check counter; after
@@ -1536,9 +1541,20 @@
         setChannelStatus("disconnected");
       }
       if (state.pendingHashTopic) {
+        const wasPending = state.pendingHashTopic;
         await fetchTopics();
-        tickPendingHashTopic();
-        renderTopicTabs();
+        // fetchTopics already ran reconcilePendingHashTopic internally.
+        // If the topic disappeared from pending during that call, it
+        // resolved — trigger a reload so the workspace shows its data.
+        // Otherwise the topic is still missing; tick the counter toward
+        // the ~20s fallback.
+        if (wasPending && !state.pendingHashTopic) {
+          renderTopicTabs();
+          await loadState();
+        } else {
+          tickPendingHashTopic();
+          renderTopicTabs();
+        }
       }
     }
     setInterval(poll, 5000);
