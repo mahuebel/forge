@@ -65,6 +65,58 @@
     while (el && el.firstChild) el.removeChild(el.firstChild);
   }
 
+  // ─── Hash routing ──────────────────────────────────────────────────────────
+  //
+  // The URL hash is the single source of truth for navigation:
+  //   #/<topicId>              → grid view of that topic
+  //   #/<topicId>/<variation>  → full view of that variation (a–z)
+  //   (empty)                  → auto-select newest real topic
+  //
+  // All other state (verdicts, annotations, accepted, round) flows through
+  // the event stream. Opening the same URL twice never mutates state.
+
+  function parseHash(hash) {
+    if (!hash || hash === "#" || hash === "#/") return { topicId: null, variation: null };
+    const raw = hash.replace(/^#\/?/, "");
+    const parts = raw.split("/").filter(Boolean);
+    if (parts.length === 0) return { topicId: null, variation: null };
+    const topicId = /^[a-z0-9][a-z0-9-]{0,63}$/.test(parts[0]) ? parts[0] : null;
+    let variation = null;
+    if (parts.length >= 2 && /^[a-z]$/.test(parts[1])) {
+      variation = parts[1];
+    }
+    return { topicId, variation };
+  }
+
+  function buildHash(topicId, variation) {
+    if (!topicId) return "";
+    if (variation) return "#/" + topicId + "/" + variation;
+    return "#/" + topicId;
+  }
+
+  // Computes the hash that reflects current state and writes it with
+  // replaceState (no history-stack pollution). A suppression flag lets
+  // handleHashChange skip the round-trip when it just applied an external
+  // change.
+  let suppressNextHashChange = false;
+
+  function updateHash() {
+    const topicId =
+      state.activeTopic && state.activeTopic !== "default"
+        ? state.activeTopic
+        : null;
+    const variation =
+      state.view === "full" && state.activeVariation
+        ? state.activeVariation
+        : null;
+    const target = buildHash(topicId, variation);
+    const current = location.hash || "";
+    if (current === target) return;
+    suppressNextHashChange = true;
+    const url = location.pathname + location.search + target;
+    history.replaceState(null, "", url);
+  }
+
   // ─── API ───────────────────────────────────────────────────────────────────
 
   async function postEvent(eventData) {
