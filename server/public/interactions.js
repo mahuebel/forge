@@ -19,6 +19,12 @@
     // (variations, annotations, round, prompt) reflects the active one.
     topics: [],              // [{id, title, createdAt}]
     activeTopic: "default",
+    // True once the user (or the URL hash) has explicitly chosen a topic.
+    // Auto-selection (pickNewestRealTopic) does not set this flag so the
+    // client keeps promoting newer topics to the foreground during the
+    // initial bootstrap window. Once explicit, server-switched topics no
+    // longer drag the view away.
+    hasExplicitTopic: false,
     // Terminal pick for the current topic+round — null until the user
     // clicks Accept on a variation. Cleared on each new round event.
     // Latest accept wins (last-write) during replay, matching the
@@ -83,12 +89,17 @@
       if (!res.ok) return;
       const data = await res.json();
       state.topics = data.topics || [];
-      // Preserve the client's current selection if it still exists.
-      // Claude creating a new topic server-side flips the server's
-      // activeId to that new topic; we don't want that to drag the
-      // developer out of the tab they're reading.
+      // Preserve the client's current selection if it still exists AND
+      // the user has made an explicit pick (hasExplicitTopic). Without an
+      // explicit pick, auto-select the newest non-default topic so the
+      // workspace opens on a real tab instead of the vestigial default.
       const stillPresent = state.topics.some((t) => t.id === state.activeTopic);
-      if (!stillPresent) {
+      if (stillPresent && state.hasExplicitTopic) return;
+      if (stillPresent && state.activeTopic !== "default") return;
+      const newest = pickNewestRealTopic(state.topics);
+      if (newest) {
+        state.activeTopic = newest.id;
+      } else if (!stillPresent) {
         state.activeTopic = data.activeId || "default";
       }
     } catch (err) {
@@ -96,9 +107,20 @@
     }
   }
 
+  function pickNewestRealTopic(topics) {
+    const real = topics.filter((t) => t.id !== "default");
+    if (real.length === 0) return null;
+    let newest = real[0];
+    for (const t of real) {
+      if ((t.createdAt || 0) > (newest.createdAt || 0)) newest = t;
+    }
+    return newest;
+  }
+
   async function switchTopic(topicId) {
     if (!topicId || topicId === state.activeTopic) return;
     state.activeTopic = topicId;
+    state.hasExplicitTopic = true;
     // Best-effort server-side active-topic update. If the server doesn't
     // know about this topic we just keep the client choice.
     fetch("/api/topics/active", {
@@ -227,6 +249,7 @@
 
       renderCurrentView();
       updateStats();
+      updateEmptyState();
     } catch (err) {
       console.error("[forge] loadState error:", err);
     }
@@ -404,20 +427,34 @@
     renderNotesSidebar();
   }
 
+  function updateEmptyState() {
+    const empty = document.getElementById("workspace-empty");
+    const grid = document.getElementById("grid-container");
+    const full = document.getElementById("full-container");
+    if (!empty) return;
+    const realTopics = state.topics.filter((t) => t.id !== "default");
+    const showEmpty = realTopics.length === 0;
+    empty.style.display = showEmpty ? "" : "none";
+    if (grid) grid.style.display = showEmpty ? "none" : "";
+    if (full) full.style.display = showEmpty ? "none" : "";
+  }
+
   function renderTopicTabs() {
     const bar = document.getElementById("topic-tabs");
     if (!bar) return;
     clearChildren(bar);
 
-    // Collapse when only the default topic is in play — no point showing
-    // a tab strip with a single item.
-    const showTabs =
-      state.topics.length > 1 ||
-      (state.topics.length === 1 && state.topics[0].id !== "default");
+    // The bootstrap "default" topic is never shown in the UI. It exists
+    // server-side for legacy migration only. Users navigate between real
+    // topics created by /forge invocations.
+    const visible = state.topics.filter((t) => t.id !== "default");
+
+    // Collapse when fewer than two real topics — nothing to switch to.
+    const showTabs = visible.length > 1;
     bar.classList.toggle("single", !showTabs);
     if (!showTabs) return;
 
-    for (const t of state.topics) {
+    for (const t of visible) {
       const btn = document.createElement("button");
       btn.className = "topic-tab";
       if (t.id === state.activeTopic) btn.classList.add("active");
@@ -1214,6 +1251,7 @@
             // when the change is in the topic we're currently showing.
             fetchTopics().then(() => {
               renderTopicTabs();
+              updateEmptyState();
               if (!msg.topicId || msg.topicId === state.activeTopic) {
                 loadState();
               }
