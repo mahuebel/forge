@@ -25,12 +25,20 @@
     // initial bootstrap window. Once explicit, server-switched topics no
     // longer drag the view away.
     hasExplicitTopic: false,
+    // Hash-pointed topic that has not yet appeared in the registry.
+    // While set, checkPendingHashTopic will retry on each WS reload and
+    // on each health-poll tick. After PENDING_HASH_MAX_CHECKS with no
+    // resolution, the banner appears and we fall back to the newest.
+    pendingHashTopic: null,
+    pendingHashChecks: 0,
     // Terminal pick for the current topic+round — null until the user
     // clicks Accept on a variation. Cleared on each new round event.
     // Latest accept wins (last-write) during replay, matching the
     // "overwrite until consumer acks" semantics.
     accepted: null,          // variation letter or null
   };
+
+  const PENDING_HASH_MAX_CHECKS = 4; // 4 × 5s health poll = ~20s
 
   // Ephemeral state for the annotate flow: between the overlay click and
   // the submit of the input popup, the iframe asynchronously sends back a
@@ -141,6 +149,10 @@
       if (!res.ok) return;
       const data = await res.json();
       state.topics = data.topics || [];
+      checkPendingHashTopic();
+      // While a hash-pointed topic is still pending, don't overwrite the
+      // active selection — we're holding it for the topic to appear.
+      if (state.pendingHashTopic) return;
       // Preserve the client's selection when it still exists. The two
       // guards cover: (1) the user explicitly picked this topic — never
       // swap it out; (2) we already auto-promoted a real topic and it's
@@ -572,6 +584,68 @@
     empty.style.display = showEmpty ? "" : "none";
     if (grid) grid.style.display = showEmpty ? "none" : "";
     if (full) full.style.display = showEmpty ? "none" : "";
+  }
+
+  function showBanner(message, dismissable) {
+    const el = document.getElementById("workspace-banner");
+    if (!el) return;
+    clearChildren(el);
+    const text = document.createElement("span");
+    text.textContent = message;
+    el.appendChild(text);
+    if (dismissable) {
+      const btn = document.createElement("button");
+      btn.className = "workspace-banner-dismiss";
+      btn.textContent = "Dismiss";
+      btn.addEventListener("click", () => {
+        el.style.display = "none";
+      });
+      el.appendChild(btn);
+    }
+    el.style.display = "";
+  }
+
+  function hideBanner() {
+    const el = document.getElementById("workspace-banner");
+    if (el) el.style.display = "none";
+  }
+
+  // Called after each fetchTopics to see whether the hash-pointed topic
+  // has arrived. Increments a counter; after PENDING_HASH_MAX_CHECKS
+  // unsuccessful attempts, falls back to the newest real topic and
+  // raises a dismissable banner.
+  function checkPendingHashTopic() {
+    if (!state.pendingHashTopic) return;
+    const found = state.topics.some((t) => t.id === state.pendingHashTopic);
+    if (found) {
+      state.pendingHashTopic = null;
+      state.pendingHashChecks = 0;
+      hideBanner();
+      return;
+    }
+    state.pendingHashChecks += 1;
+    if (state.pendingHashChecks >= PENDING_HASH_MAX_CHECKS) {
+      const missing = state.pendingHashTopic;
+      state.pendingHashTopic = null;
+      state.pendingHashChecks = 0;
+      const newest = pickNewestRealTopic(state.topics);
+      if (newest) {
+        state.activeTopic = newest.id;
+        state.hasExplicitTopic = false; // allow subsequent auto-promote
+        updateHash();
+        renderTopicTabs();
+        loadState();
+      }
+      showBanner(
+        'Topic "' + missing + '" not found — showing newest.',
+        true
+      );
+    } else {
+      showBanner(
+        'Loading topic "' + state.pendingHashTopic + '"…',
+        false
+      );
+    }
   }
 
   function renderTopicTabs() {
@@ -1446,6 +1520,10 @@
       } catch {
         setChannelStatus("disconnected");
       }
+      if (state.pendingHashTopic) {
+        await fetchTopics();
+        renderTopicTabs();
+      }
     }
     setInterval(poll, 5000);
     poll();
@@ -1457,6 +1535,22 @@
     wireToolbar();
     wireFeedbackBar();
     wireGeneralNote();
+
+    // Honor URL hash on boot. Setting activeTopic here (before loadState)
+    // means the first fetch targets the hashed topic, not the default.
+    // pendingHashTopic stays set until fetchTopics confirms the topic
+    // exists; see checkPendingHashTopic.
+    const parsed = parseHash(location.hash);
+    if (parsed.topicId) {
+      state.activeTopic = parsed.topicId;
+      state.hasExplicitTopic = true;
+      state.pendingHashTopic = parsed.topicId;
+    }
+    if (parsed.variation) {
+      state.activeVariation = parsed.variation;
+      applyView("full");
+    }
+
     window.addEventListener("hashchange", handleHashChange);
     loadState();
     connectWebSocket();
@@ -1474,6 +1568,14 @@
     if (topicId && topicId !== state.activeTopic) {
       state.activeTopic = topicId;
       state.hasExplicitTopic = true;
+      // If this topic isn't in the known registry yet, mark it pending
+      // so fetchTopics' early-return and checkPendingHashTopic's banner
+      // kick in (same flow as boot-from-hash).
+      const known = state.topics.some((t) => t.id === topicId);
+      if (!known) {
+        state.pendingHashTopic = topicId;
+        state.pendingHashChecks = 0;
+      }
       renderTopicTabs();
       await loadState();
     }
