@@ -377,6 +377,15 @@
 
   // ─── Rendering ─────────────────────────────────────────────────────────────
 
+  function applyView(targetView) {
+    if (state.view === targetView) return;
+    state.view = targetView;
+    document.body.dataset.view = targetView;
+    document.querySelectorAll(".view-toggle-btn[data-view]").forEach((b) => {
+      b.classList.toggle("active", b.getAttribute("data-view") === targetView);
+    });
+  }
+
   function renderCurrentView() {
     if (state.view === "grid") {
       renderGridView();
@@ -1237,10 +1246,7 @@
       btn.addEventListener("click", () => {
         const view = btn.getAttribute("data-view");
         if (!view) return;
-        state.view = view;
-        document.body.dataset.view = view;
-        viewBtns.forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
+        applyView(view);
         updateHash();
         renderCurrentView();
       });
@@ -1476,34 +1482,21 @@
     if (variation) {
       if (findVariation(variation)) {
         state.activeVariation = variation;
-        if (state.view !== "full") {
-          state.view = "full";
-          document.body.dataset.view = "full";
-          document.querySelectorAll(".view-toggle-btn[data-view]").forEach((b) => {
-            b.classList.toggle("active", b.getAttribute("data-view") === "full");
-          });
-        }
+        applyView("full");
       } else {
         // Unknown variation letter for this topic → fall back to grid.
-        if (state.view !== "grid") {
-          state.view = "grid";
-          document.body.dataset.view = "grid";
-          document.querySelectorAll(".view-toggle-btn[data-view]").forEach((b) => {
-            b.classList.toggle("active", b.getAttribute("data-view") === "grid");
-          });
-        }
+        applyView("grid");
       }
     } else {
       // No variation in the new hash → grid view.
-      if (state.view !== "grid") {
-        state.view = "grid";
-        document.body.dataset.view = "grid";
-        document.querySelectorAll(".view-toggle-btn[data-view]").forEach((b) => {
-          b.classList.toggle("active", b.getAttribute("data-view") === "grid");
-        });
-      }
+      applyView("grid");
     }
 
+    // Write the final URL after all state transitions are applied — this
+    // overrides any interim hash that loadState may have written when the
+    // variation hadn't been resolved yet. Idempotent when the hash is
+    // already in sync.
+    updateHash();
     renderCurrentView();
   }
 
