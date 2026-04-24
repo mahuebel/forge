@@ -139,6 +139,13 @@ Whenever you need to write a variation, read the `contentDir` returned by `POST 
 
 ## Phase 2: Generating Variations
 
+Variations generate in parallel via **orchestrator-workers**: you (the parent) synthesize a brief and assign a distinct angle per slot, then dispatch one subagent per variation in a single message. Each worker writes its HTML file and returns a short summary; you then append a single `round` event.
+
+**Why parallel, not serial:**
+- Wall-clock scales with `max(t_a, t_b, t_c)` instead of the sum.
+- Parent context stays clean — generated HTML never lands in the transcript.
+- Workers have independent contexts, so variations don't anchor on each other mid-generation.
+
 ### File naming
 
 Write files to the topic's `contentDir` — absolute path returned by `POST /api/topics` — using this convention:
@@ -159,9 +166,54 @@ Round numbers increment with each generation pass within a topic; they reset to 
 - **Meaningfully distinct** — each variation should explore a genuinely different approach: different layout, visual hierarchy, interaction pattern, or information density. Not the same design with swapped colors.
 - Responsive where appropriate; coherent dark theme recommended (matches the workspace).
 
-### Round event
+### Step 1 — Synthesize the brief and assign angles
 
-After writing the variation files, append one line to `<baseDir>/.forge/sessions/<sessionId>/state/events.jsonl`:
+Before dispatching, decide:
+
+1. **Core brief** — what every variation must satisfy (the developer's prompt + any constraints gathered in chat).
+2. **Accumulated feedback** (refine rounds only) — distill prior rounds into: what was liked, what was rejected, open annotations. This goes into every worker prompt so each one addresses the full picture.
+3. **Per-slot angle** — for N variations, name N orthogonal directions. Pick angles that are genuinely different axes, not shades of the same approach. Example for a dashboard:
+   - `A`: data-dense, power-user oriented
+   - `B`: minimalist, single focal task
+   - `C`: visual-first, chart-driven
+
+   The workers will be told what the other slots are exploring so they don't converge.
+
+### Step 2 — Dispatch workers in parallel
+
+In a **single assistant message**, issue N `Agent` tool calls with `subagent_type: "forge-variation-worker"`. They run concurrently. The worker agent has the HTML requirements, output rules, and anti-patterns baked into its system prompt — your prompt just needs to supply the per-invocation context.
+
+Worker prompt template (fill in the braces):
+
+```
+Variation {LETTER}, round {ROUND}.
+
+Output path (absolute):
+  {CONTENT_DIR}/round-{ROUND}-{letter}.html
+
+## Brief
+{core brief synthesized from developer prompt + any constraints}
+
+## Your angle
+{one sentence describing this slot's distinctive direction}
+
+## Other variations in this round — do NOT duplicate their direction
+- A: {angle A}
+- B: {angle B}
+- C: {angle C}
+
+## Accumulated feedback from prior rounds
+{liked / rejected / annotated synthesis — omit this block on round 1}
+
+## Prior-variation excerpt to carry forward
+{file contents or relevant slice, if the developer asked for "more like A" — omit otherwise}
+```
+
+If the developer asked for "more like A" or otherwise referenced a specific prior variation, read that file yourself and embed the relevant contents in the worker prompt(s) that need it. Do not tell the worker to read it — the file may be overwritten by the time the worker runs.
+
+### Step 3 — Append the round event (orchestrator only)
+
+Wait for all workers to return. Then append **one** line to `<baseDir>/.forge/sessions/<sessionId>/state/events.jsonl`:
 
 ```json
 {"type":"round","topic_id":"provider-dashboard","seq":0,"round":1,"variations":["a","b","c"],"prompt":"3 variations of a provider dashboard with dark theme","timestamp":1713200030}
@@ -170,12 +222,23 @@ After writing the variation files, append one line to `<baseDir>/.forge/sessions
 - `topic_id`: the topic this round belongs to — must match the slug returned by `POST /api/topics`. Without it, events fall back to the currently-active topic which may not be yours.
 - `seq`: always write `0` — the bridge assigns ordering by file position
 - `round`: increment with each generation pass **within this topic** (rounds are per-topic, not global)
-- `variations`: array of letter strings matching the files you wrote
+- `variations`: array of letter strings for the files that actually landed (see partial failure below)
 - `timestamp`: `Date.now()` in milliseconds (Unix millis, not seconds)
 
-Then tell the developer:
+The parent owns this append, not the workers — a single writer avoids races on `events.jsonl`.
+
+### Step 4 — Announce
 
 > Round 1 is ready — 3 variations at **http://localhost:4546**
+
+### Partial failure
+
+If 1 of N workers fails or times out:
+
+1. Re-dispatch just that slot once with the same prompt.
+2. If it fails again, ship the round with the slots that did land — the `variations` array in the round event lists only the letters whose files exist. Tell the developer which slot was skipped and why, and offer to retry it as a follow-up.
+
+Do not block the entire round behind a single stuck worker.
 
 ### View mode guidance
 
@@ -268,9 +331,9 @@ When any of these happen:
 1. Reference the accumulated feedback explicitly:
    > You liked A's layout and the stat card pattern. You noted that B needs a time range picker (pin #2). C was rejected — too sparse. Here's Round 2...
 
-2. Write new variation files (`round-2-a.html`, `round-2-b.html`, etc.) incorporating all feedback.
+2. Run the Phase 2 dispatch pattern with the feedback distilled into every worker prompt and the round number incremented. If the developer asked for "more like A", read the prior file and embed the relevant contents in the applicable worker prompts.
 
-3. Append a new round event to `events.jsonl` with `"round": 2` (incremented).
+3. After all workers return, append the new round event to `events.jsonl` with `"round": 2` (incremented).
 
 4. Tell the developer variations are ready.
 
