@@ -424,9 +424,77 @@
   }
 
   function renderFullView() {
+    renderFullViewHeader();
     renderChipBar();
     renderFullContent();
     renderNotesSidebar();
+  }
+
+  function renderFullViewHeader() {
+    const host = document.getElementById("full-header");
+    if (!host) return;
+    clearChildren(host);
+    host.className = "full-view-header";
+
+    const v = findVariation(state.activeVariation);
+    if (!v) {
+      host.style.display = "none";
+      return;
+    }
+    host.style.display = "";
+
+    if (v.status === "liked") host.classList.add("liked");
+    if (v.status === "rejected") host.classList.add("rejected");
+    if (state.accepted) {
+      if (state.accepted === v.variation) host.classList.add("accepted");
+      else host.classList.add("dimmed");
+    }
+
+    const label = document.createElement("div");
+    label.className = "full-view-label";
+    label.textContent = v.variation.toUpperCase() + " — Variation";
+    host.appendChild(label);
+
+    const actions = document.createElement("div");
+    actions.className = "full-view-actions";
+
+    const likeBtn = document.createElement("button");
+    likeBtn.className = "panel-action";
+    if (v.status === "liked") likeBtn.classList.add("liked");
+    likeBtn.textContent = "\u2713"; // ✓
+    likeBtn.title = "Like this variation";
+    likeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleVerdict(v.variation, "like");
+    });
+    actions.appendChild(likeBtn);
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.className = "panel-action";
+    if (v.status === "rejected") rejectBtn.classList.add("rejected");
+    rejectBtn.textContent = "\u2717"; // ✗
+    rejectBtn.title = "Reject this variation";
+    rejectBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleVerdict(v.variation, "reject");
+    });
+    actions.appendChild(rejectBtn);
+
+    const acceptBtn = document.createElement("button");
+    acceptBtn.className = "panel-action accept-btn";
+    if (state.accepted === v.variation) acceptBtn.classList.add("accepted");
+    acceptBtn.title =
+      state.accepted === v.variation
+        ? "Accepted — click a different variation to change"
+        : "Accept this as the final pick";
+    acceptBtn.textContent = state.accepted === v.variation ? "\uD83D\uDD12" : "Accept";
+    acceptBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleAccept(v.variation);
+    });
+    actions.appendChild(acceptBtn);
+
+    host.appendChild(actions);
   }
 
   function updateEmptyState() {

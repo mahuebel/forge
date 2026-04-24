@@ -493,6 +493,48 @@ body[data-view="full"] .chip-bar {
   background: #fff;
 }
 
+.full-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+}
+
+.full-view-header.liked {
+  border-color: #166534;
+}
+
+.full-view-header.rejected {
+  border-color: #7f1d1d;
+}
+
+.full-view-header.accepted {
+  border-color: #a16207;
+}
+
+.full-view-header.dimmed {
+  opacity: 0.75;
+}
+
+.full-view-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.full-view-actions {
+  display: flex;
+  gap: 6px;
+}
+
+body[data-view="grid"] .full-view-header {
+  display: none;
+}
+
 /* ============================================================
    7. Notes sidebar
    ============================================================ */
