@@ -94,6 +94,14 @@ Claude starts the workspace server, writes three HTML files, and tells you the U
 
 That's the whole setup. You never run the Bun server yourself.
 
+**Hands-off?** Use auto mode:
+
+```
+/forge auto a settings page with profile, billing, and notifications sections
+```
+
+Claude generates variations, scores them with a judge panel, refines across multiple rounds (default 2), and hands you a **ranked shortlist** — no clicking required. The variations still land in the workspace so you can inspect them, and the final pick is yours: Accept one in the browser or say "go with B". Runs as a background [dynamic workflow](skills/forge/auto-forge.workflow.mjs).
+
 ---
 
 ## What you see in the browser

@@ -1,6 +1,6 @@
 {
   "name": "forge",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "private": true,
   "description": "Visual workspace for iterating on UI with Claude Code",

@@ -16,6 +16,11 @@ Forge gives you a browser-based workspace for generating, comparing, and refinin
 - Claude acknowledges feedback and incorporates it into the next round when you ask to refine
 - When done, Claude writes the final result as actual project files matching your stack
 
+Forge has two modes:
+
+- **Interactive** (default `/forge <prompt>`) — the human-in-the-loop cycle described above. Phases 1–4 below.
+- **Auto** (`/forge auto <prompt>`) — headless: Claude generates and judges rounds with no browser feedback, then hands you a scored shortlist. See [Auto Mode](#auto-mode-forge-auto) at the end of this document.
+
 ---
 
 ## Phase 1: Setup (once per session)
@@ -364,6 +369,67 @@ When either happens:
    > Written to `src/components/ProviderDashboard.tsx`. Import it where needed.
 
 The workspace stays open — the developer can start a new `/forge` round immediately.
+
+---
+
+## Auto Mode (`/forge auto`)
+
+Auto mode self-drives the loop: instead of waiting for browser feedback between rounds, Claude generates variations, scores them with a judge panel, distills a critique, and feeds it into the next round — all unattended. It ends with a **ranked shortlist**, not an auto-shipped file. Use it when the developer says `/forge auto …`, or asks forge to "just generate and pick", "run it headless", "give me a shortlist without me clicking", etc.
+
+The batch orchestration lives in a dynamic workflow script (`auto-forge.workflow.mjs`); this skill owns everything the workflow sandbox can't touch — the server, the filesystem, and resolution.
+
+### Step 1 — Setup
+
+Identical to **Phase 1**: find or launch the server (PID/version checks), then `POST /api/topics` to allocate the topic. You need the absolute `contentDir` and the `topic.id` from the response.
+
+### Step 2 — Synthesize the run config
+
+Same thinking as **Phase 2, Step 1**, but you decide all of it up front (there's no human to react mid-run):
+
+- **`brief`** — what every variation must satisfy (developer prompt + any constraints gathered in chat).
+- **`slots`** — an array of `{ letter, angle }`, one orthogonal direction per variation (default 3). Pick genuinely different axes, not shades of one approach.
+- **`rounds`** — how many generate→judge passes (default 2). Each round after the first is seeded by the prior winner + critique.
+- **`lenses`** — the judge dimensions (default `["fitness-to-brief", "visual-hierarchy", "aesthetic-polish"]`). Each variation is scored by one judge per lens and the scores are averaged.
+
+### Step 3 — Invoke the workflow
+
+This is an explicit, sanctioned instruction to call the `Workflow` tool (a skill directing the call is the opt-in path):
+
+```
+Workflow({
+  scriptPath: "${CLAUDE_PLUGIN_ROOT}/skills/forge/auto-forge.workflow.mjs",
+  args: { contentDir, brief, slots, rounds, lenses }
+})
+```
+
+The run is backgrounded — you're notified on completion. Optionally call `notify-workspace` to toast "Auto-forge running — generating round 1…" so the developer knows what the appearing files are. The workflow's worker agents write `round-{N}-{letter}.html` into `contentDir` as they go, so the workspace file-watcher hot-loads them live during the run; the round **grouping and announcement** happen when you append events on completion (next step).
+
+### Step 4 — On return, append round events (single-writer)
+
+The workflow returns `{ winner, trail, rounds }` where `trail` is `[{ round, ranked: [{ letter, path, score, strengths, weaknesses, shipVotes }, …] }]`. The workflow could not write `events.jsonl` (sandboxed), so **you** append the round events now — one line per `trail` entry, in round order, exactly the shape from **Phase 2, Step 3**:
+
+```json
+{"type":"round","topic_id":"<topicId>","seq":0,"round":1,"variations":["a","b","c"],"prompt":"<brief>","timestamp":<Date.now() ms>}
+```
+
+`variations` = the letters in that round's `ranked`. The parent is the single writer here, just as in interactive mode.
+
+If `winner` is `null`, no variations landed — tell the developer the run produced nothing and offer to retry.
+
+### Step 5 — Present the shortlist
+
+Report the ranked outcome in chat, highest score first, so the developer can choose:
+
+> Auto-forge ran 2 rounds. Final shortlist:
+> 1. **B** (87) — strong visual hierarchy, clear focal task; weak on data density
+> 2. **A** (79) — dense and information-rich; cluttered header
+> 3. **C** (71) — chart-driven; under-uses vertical space
+>
+> All three are in the workspace. Want me to write **B** into your project, or Accept a different one in the browser?
+
+### Step 6 — Resolution
+
+Auto mode **stops at the shortlist** — do not write project files unattended. When the developer Accepts a card in the browser or says "go with B", run **Phase 4** exactly as in interactive mode. The judge panel reliably catches broken hierarchy and unfinished work, but "tasteful" is a human call — so the final pick stays with the developer.
 
 ---
 
